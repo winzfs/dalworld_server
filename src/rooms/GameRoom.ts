@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { GAME_CONFIG, getPublicGameConfig } from '../config/gameConfig';
 import type { Env } from '../env';
 import type {
   ClientToServerMessage,
@@ -7,10 +8,9 @@ import type {
 } from '../protocol/messages';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
-import { WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
 
-const SNAPSHOT_RATE = 20;
-const RATE_LIMIT_PER_SECOND = 120;
+const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
+const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
 
 type RateLimitEntry = { count: number; resetAt: number };
 
@@ -31,14 +31,12 @@ export class GameRoom extends DurableObject<Env> {
     this.simulation.world.players.set(playerId, createPlayer(playerId));
 
     const now = Date.now();
+    const publicConfig = getPublicGameConfig();
     this.send(server, {
       type: 'welcome',
       playerId,
-      world: {
-        width: WORLD_WIDTH,
-        height: WORLD_HEIGHT,
-        tickRate: this.simulation.tickRate,
-      },
+      world: publicConfig.world,
+      gameplay: publicConfig.gameplay,
       serverTime: now,
     });
 
