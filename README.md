@@ -93,21 +93,18 @@ npm run db:migrate:remote
 
 ## Cloudflare 배포
 
+GitHub `winzfs/dalworld_server` 가 Workers Git 연동으로 main 브랜치에서 자동 배포됩니다.
+수동 배포가 필요하면:
+
 ```bash
 npx wrangler deploy
 ```
 
-배포되면 기본 URL은 다음과 같습니다.
+현재 배포된 URL:
 
-```txt
-https://dalworld-server.<your-subdomain>.workers.dev
-```
-
-WebSocket URL:
-
-```txt
-wss://dalworld-server.<your-subdomain>.workers.dev/ws
-```
+- HTTP base: <https://dalworld-server.jazzhjm.workers.dev>
+- Health: <https://dalworld-server.jazzhjm.workers.dev/health>
+- WebSocket: `wss://dalworld-server.jazzhjm.workers.dev/ws`
 
 ## 현재 구현된 기능
 
