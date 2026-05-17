@@ -39,6 +39,8 @@ export type ResourceSnapshot = {
   maxHp: number;
   /** 0 if alive, otherwise epoch ms when it will respawn */
   respawnAt: number;
+  /** true when the resource is harvestable (hp > 0 and not waiting to respawn) */
+  alive: boolean;
 };
 
 export type MonsterSnapshot = {
@@ -69,13 +71,15 @@ export type ClientToServerMessage =
   | {
       type: 'gather';
       seq: number;
-      resourceId: string;
+      /** Preferred target; server picks nearest in range when omitted or invalid. */
+      resourceId?: string;
     }
   | { type: 'ping'; now: number };
 
 export type ServerEvent =
   | { type: 'player_joined'; playerId: string }
   | { type: 'player_left'; playerId: string }
+  | { type: 'resource_hit'; resourceId: string; resourceType: ResourceType; hpRemaining: number }
   | { type: 'resource_destroyed'; resourceId: string; resourceType: ResourceType }
   | { type: 'item_gained'; playerId: string; item: ItemType; amount: number };
 
