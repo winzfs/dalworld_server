@@ -1,0 +1,19 @@
+{
+  "name": "dalworld_server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "db:migrate:local": "wrangler d1 migrations apply dalworld-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply dalworld-db --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250510.0",
+    "typescript": "^5.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
