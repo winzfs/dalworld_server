@@ -60,6 +60,16 @@ export type WorldInfo = {
   tickRate: number;
 };
 
+export type PublicGameplayConfig = {
+  playerRadius: number;
+  gatherRange: number;
+};
+
+export type PublicGameConfig = {
+  world: WorldInfo;
+  gameplay: PublicGameplayConfig;
+};
+
 export type ClientToServerMessage =
   | { type: 'hello'; name?: string }
   | {
@@ -88,6 +98,7 @@ export type ServerToClientMessage =
       type: 'welcome';
       playerId: string;
       world: WorldInfo;
+      gameplay: PublicGameplayConfig;
       serverTime: number;
     }
   | {
