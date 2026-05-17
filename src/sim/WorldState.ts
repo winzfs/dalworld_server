@@ -1,3 +1,4 @@
+import { GAME_CONFIG } from '../config/gameConfig';
 import type {
   Facing,
   Inventory,
@@ -9,10 +10,10 @@ import type {
   ServerEvent,
 } from '../protocol/messages';
 
-export const WORLD_WIDTH = 3000;
-export const WORLD_HEIGHT = 3000;
-export const TICK_RATE = 20;
-export const PLAYER_RADIUS = 18;
+export const WORLD_WIDTH = GAME_CONFIG.world.width;
+export const WORLD_HEIGHT = GAME_CONFIG.world.height;
+export const TICK_RATE = GAME_CONFIG.world.tickRate;
+export const PLAYER_RADIUS = GAME_CONFIG.player.radius;
 
 export type PlayerEntity = {
   id: string;
