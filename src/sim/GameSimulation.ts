@@ -1,12 +1,9 @@
+import { GAME_CONFIG } from '../config/gameConfig';
 import type { MonsterSnapshot, ResourceSnapshot, ServerToClientMessage } from '../protocol/messages';
 import { MonsterSystem } from './MonsterSystem';
 import { PlayerSystem } from './PlayerSystem';
 import { ResourceSystem } from './ResourceSystem';
 import { TICK_RATE, WorldState } from './WorldState';
-
-const STARTING_TREES = 60;
-const STARTING_STONES = 40;
-const STARTING_MONSTERS = 8;
 
 export class GameSimulation {
   readonly world = new WorldState();
@@ -15,8 +12,8 @@ export class GameSimulation {
   readonly monsters = new MonsterSystem();
 
   constructor() {
-    this.resources.seed(this.world, STARTING_TREES, STARTING_STONES);
-    this.monsters.seed(this.world, STARTING_MONSTERS);
+    this.resources.seed(this.world, GAME_CONFIG.resource.startingTrees, GAME_CONFIG.resource.startingStones);
+    this.monsters.seed(this.world, GAME_CONFIG.monster.startingMonsters);
   }
 
   step(dt: number, nowMs: number): void {
