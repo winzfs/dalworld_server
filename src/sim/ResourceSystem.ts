@@ -1,9 +1,15 @@
 import type { ItemType, ResourceType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
 import { distance, randomRange } from '../utils/math';
-import { WORLD_HEIGHT, WORLD_WIDTH, type PlayerEntity, type ResourceEntity, type WorldState } from './WorldState';
+import {
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
+  type PlayerEntity,
+  type ResourceEntity,
+  type WorldState,
+} from './WorldState';
 
-export const GATHER_RANGE = 60;
+export const GATHER_RANGE = 80;
 export const GATHER_COOLDOWN_MS = 400;
 export const GATHER_DAMAGE = 25;
 export const STAMINA_COST_PER_GATHER = 8;
@@ -23,13 +29,9 @@ const TEMPLATES: Record<ResourceType, ResourceTemplate> = {
 
 export type GatherResult =
   | { ok: true; destroyed: boolean; resource: ResourceEntity }
-  | {
-      ok: false;
-      reason: 'cooldown' | 'out_of_range' | 'unavailable' | 'no_stamina';
-    };
+  | { ok: false; reason: 'cooldown' | 'out_of_range' | 'unavailable' | 'no_stamina' };
 
 export class ResourceSystem {
-  /** Seed the world with starting resource nodes. */
   seed(world: WorldState, treeCount: number, stoneCount: number): void {
     for (let i = 0; i < treeCount; i++) {
       const node = this.spawn('tree');
@@ -54,7 +56,12 @@ export class ResourceSystem {
     }
   }
 
-  gather(world: WorldState, player: PlayerEntity, resourceId: string, nowMs: number): GatherResult {
+  gather(
+    world: WorldState,
+    player: PlayerEntity,
+    resourceId: string | undefined,
+    nowMs: number,
+  ): GatherResult {
     if (nowMs < player.nextGatherAt) {
       return { ok: false, reason: 'cooldown' };
     }
@@ -62,8 +69,27 @@ export class ResourceSystem {
       return { ok: false, reason: 'no_stamina' };
     }
 
-    const resource = world.resources.get(resourceId);
-    if (!resource || resource.respawnAt !== 0 || resource.hp <= 0) {
+    // Resolve target: use provided ID or fall back to nearest alive resource in range.
+    let resource: ResourceEntity | undefined;
+    if (resourceId) {
+      const candidate = world.resources.get(resourceId);
+      if (candidate && candidate.respawnAt === 0 && candidate.hp > 0) {
+        resource = candidate;
+      }
+    }
+    if (!resource) {
+      let nearestDist = GATHER_RANGE;
+      for (const r of world.resources.values()) {
+        if (r.respawnAt !== 0 || r.hp <= 0) continue;
+        const d = distance(player.x, player.y, r.x, r.y);
+        if (d < nearestDist) {
+          nearestDist = d;
+          resource = r;
+        }
+      }
+    }
+
+    if (!resource) {
       return { ok: false, reason: 'unavailable' };
     }
 
@@ -79,7 +105,11 @@ export class ResourceSystem {
       const template = TEMPLATES[resource.type];
       resource.respawnAt = nowMs + template.respawnMs;
       player.inventory[template.drop] += template.dropAmount;
-      world.pushEvent({ type: 'resource_destroyed', resourceId: resource.id, resourceType: resource.type });
+      world.pushEvent({
+        type: 'resource_destroyed',
+        resourceId: resource.id,
+        resourceType: resource.type,
+      });
       world.pushEvent({
         type: 'item_gained',
         playerId: player.id,
@@ -89,6 +119,12 @@ export class ResourceSystem {
       return { ok: true, destroyed: true, resource };
     }
 
+    world.pushEvent({
+      type: 'resource_hit',
+      resourceId: resource.id,
+      resourceType: resource.type,
+      hpRemaining: resource.hp,
+    });
     return { ok: true, destroyed: false, resource };
   }
 

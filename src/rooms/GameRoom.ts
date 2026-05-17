@@ -10,10 +10,14 @@ import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
 
 const SNAPSHOT_RATE = 20;
+const RATE_LIMIT_PER_SECOND = 120;
+
+type RateLimitEntry = { count: number; resetAt: number };
 
 export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
   private readonly sessions = new Map<WebSocket, string>();
+  private readonly rateLimits = new Map<WebSocket, RateLimitEntry>();
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
 
@@ -50,6 +54,7 @@ export class GameRoom extends DurableObject<Env> {
 
   private handleMessage(socket: WebSocket, raw: string | ArrayBuffer): void {
     if (typeof raw !== 'string') return;
+    if (!this.checkRateLimit(socket)) return;
 
     let message: ClientToServerMessage;
     try {
@@ -85,6 +90,17 @@ export class GameRoom extends DurableObject<Env> {
         return;
       }
     }
+  }
+
+  private checkRateLimit(socket: WebSocket): boolean {
+    const now = Date.now();
+    let entry = this.rateLimits.get(socket);
+    if (!entry || now >= entry.resetAt) {
+      entry = { count: 0, resetAt: now + 1000 };
+      this.rateLimits.set(socket, entry);
+    }
+    entry.count += 1;
+    return entry.count <= RATE_LIMIT_PER_SECOND;
   }
 
   private ensureLoop(): void {
@@ -143,6 +159,7 @@ export class GameRoom extends DurableObject<Env> {
   private closeSession(socket: WebSocket): void {
     const playerId = this.sessions.get(socket);
     this.sessions.delete(socket);
+    this.rateLimits.delete(socket);
 
     if (playerId) {
       this.simulation.world.players.delete(playerId);
@@ -157,5 +174,4 @@ export class GameRoom extends DurableObject<Env> {
   }
 }
 
-// Re-export so ServerEvent is reachable from the room module if needed externally.
 export type { ServerEvent };

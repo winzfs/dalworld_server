@@ -1,6 +1,6 @@
 import type { MonsterType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
-import { distance, normalize, randomRange } from '../utils/math';
+import { clamp, distance, normalize, randomRange } from '../utils/math';
 import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -94,8 +94,4 @@ export class MonsterSystem {
       loseRange: template.loseRange,
     };
   }
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v));
 }

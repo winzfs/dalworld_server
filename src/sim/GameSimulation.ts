@@ -35,6 +35,7 @@ export class GameSimulation {
       hp: r.hp,
       maxHp: r.maxHp,
       respawnAt: r.respawnAt,
+      alive: r.respawnAt === 0 && r.hp > 0,
     }));
 
     const monsters: MonsterSnapshot[] = [...this.world.monsters.values()].map((m) => ({

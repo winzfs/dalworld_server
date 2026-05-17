@@ -1,125 +1,122 @@
-# dalworld_server
+# dalworld-server
 
-Cloudflare Workers + Durable Objects + D1 기반 dalworld 게임 서버입니다.
-모든 핵심 게임 로직(이동, 충돌, 자원 채집, 몬스터 AI, 아이템 획득)은 서버 권위(Server-Authoritative)
-로 처리합니다.
+Cloudflare Workers + Durable Objects + D1 SQLite 기반 서버 권위 2D 멀티플레이 생존 게임 서버.
 
 ## 기술 스택
 
-- Cloudflare Workers (TypeScript, Web 표준 API)
-- Durable Objects (`GameRoom`, SQLite-backed)
-- D1 SQLite (영구 저장 데이터)
-- WebSocket 기반 실시간 통신
+- **Cloudflare Workers** — Worker 진입점 + HTTP 라우팅
+- **Durable Objects** — 상태 관리, tick 루프, WebSocket 세션 (SQLite 클래스)
+- **D1 SQLite** — 향후 영속 플레이어 데이터
+- **TypeScript**
+- **wrangler v4**
 
-## 폴더 구조
+## 아키텍처
 
-```txt
-src/
-├─ index.ts                # Worker fetch 라우팅
-├─ env.ts                  # Env 인터페이스
-├─ protocol/
-│  └─ messages.ts          # Client/Server 메시지 타입
-├─ rooms/
-│  └─ GameRoom.ts          # Durable Object, WebSocket 세션 관리
-├─ sim/
-│  ├─ GameSimulation.ts    # 서버 시뮬레이션 루프
-│  ├─ WorldState.ts        # 플레이어/자원/몬스터 상태
-│  ├─ PlayerSystem.ts      # 이동/스태미나
-│  ├─ ResourceSystem.ts    # 자원 노드 + 채집
-│  └─ MonsterSystem.ts     # 몬스터 스폰/AI
-└─ utils/
-   ├─ ids.ts
-   └─ math.ts
-
-migrations/
-└─ 0001_initial.sql        # players, player_inventory, world_snapshots
 ```
-
-## WebSocket
-
-- 엔드포인트: `/ws`
-- 룸: 단일 `main-world` Durable Object (확장 가능)
-- 프로토콜: JSON 메시지 (`protocol/messages.ts`)
-
-주요 클라이언트 → 서버 메시지:
-
-- `hello`
-- `input` (서버 권위 이동 입력)
-- `gather` (자원 채집 요청, 거리/쿨다운 검증)
-- `ping`
-
-주요 서버 → 클라이언트 메시지:
-
-- `welcome` (playerId + world info)
-- `snapshot` (players + resources + monsters, 20Hz)
-- `event` (`player_joined`, `player_left`, `resource_destroyed`, `item_gained`)
-- `pong`
+index.ts
+  ├─ GET /health  →  JSON { ok: true }
+  └─ GET /ws      →  GameRoom (Durable Object)
+                       ├─ WebSocket 세션 관리 (rate limit 포함)
+                       ├─ GameSimulation (20Hz tick)
+                       │   ├─ PlayerSystem  (이동·스태미나·경계 클램프)
+                       │   ├─ ResourceSystem (채집·리스폰·nearest fallback)
+                       │   └─ MonsterSystem  (AI·chase/idle)
+                       └─ snapshot broadcast 20Hz → 모든 클라이언트
+```
 
 ## 로컬 실행
 
 ```bash
 npm install
-npm run dev
+npm run dev        # wrangler dev --local (포트 8787)
 ```
 
-서버는 기본적으로 `http://localhost:8787`에서 동작합니다. WebSocket은
-`ws://localhost:8787/ws` 입니다. 클라이언트의 Vite proxy가 이 주소로 전달합니다.
-
-## D1
-
-`dalworld-db` D1 데이터베이스가 이미 생성되어 있고 `wrangler.toml`에 등록되어 있습니다.
-
-- `database_name`: `dalworld-db`
-- `database_id`: `c8a982fe-cd6e-4a89-b169-6d5e58bc8b41`
-- 리전: APAC
-
-다른 계정/환경에서 새로 만들어야 한다면:
+## 배포
 
 ```bash
-npx wrangler d1 create dalworld-db
+npm run deploy     # wrangler deploy
 ```
 
-생성된 `database_id`를 `wrangler.toml`에 반영합니다.
+## WebSocket endpoint
 
-### 마이그레이션 실행
+```
+wss://dalworld-server.<account>.workers.dev/ws
+```
+
+연결 즉시 `welcome` 메시지 수신 → 이후 `snapshot` 20Hz 수신.
+
+## D1 설정
 
 ```bash
-# 로컬 (.wrangler/state) SQLite
-npm run db:migrate:local
-
-# 원격 Cloudflare D1
-npm run db:migrate:remote
+wrangler d1 create dalworld-db
+wrangler d1 migrations apply dalworld-db --local   # 로컬 테스트
+wrangler d1 migrations apply dalworld-db            # 원격
 ```
 
-## Cloudflare 배포
+## 게임 설정값
 
-GitHub `winzfs/dalworld_server` 가 Workers Git 연동으로 main 브랜치에서 자동 배포됩니다.
-수동 배포가 필요하면:
+| 항목 | 값 |
+|------|---------|
+| 월드 크기 | 3000×3000 |
+| tickRate | 20Hz |
+| playerSpeed | 220 |
+| monsterSpeed | 80 |
+| gatherRange | 80 |
+| gatherCooldown | 400ms |
+| tree HP / respawn | 75 / 25s |
+| stone HP / respawn | 100 / 35s |
+| rate limit | 120 msg/s per socket |
 
-```bash
-npx wrangler deploy
-```
+## 메시지 프로토콜
 
-현재 배포된 URL:
+`src/protocol/messages.ts` 참조. 클라이언트에도 동일한 파일이 복사되어 있다.
 
-- HTTP base: <https://dalworld-server.jazzhjm.workers.dev>
-- Health: <https://dalworld-server.jazzhjm.workers.dev/health>
-- WebSocket: `wss://dalworld-server.jazzhjm.workers.dev/ws`
+### Client → Server
 
-## 현재 구현된 기능
+| 타입 | 설명 |
+|------|------|
+| `hello` | 연결 인사 (선택) |
+| `input` | 이동 키 + 방향 (seq 포함) |
+| `gather` | 채집 요청 (resourceId 선택, 없으면 nearest 사용) |
+| `ping` | 레이턴시 측정용 |
 
-- 서버 권위 이동 (입력 시퀀스 처리, 월드 경계 클램프)
-- 스태미나 회복 / 채집 시 스태미나 소모
-- 자원 노드 (`tree`, `stone`) 스폰 + 채집 + HP 감소 + 자동 리스폰
-- 인벤토리 (wood / stone) 서버 측 적재
-- 몬스터(`wild_slime`) 스폰 + idle / chase AI + 시야 범위
-- 20Hz 스냅샷 브로드캐스트 + 이벤트 메시지
-- D1 마이그레이션 (players, player_inventory, world_snapshots)
+### Server → Client
+
+| 타입 | 설명 |
+|------|------|
+| `welcome` | 접속 확인 + playerId + world 설정 |
+| `snapshot` | 20Hz world state (players/resources/monsters) |
+| `event` | resource_hit / resource_destroyed / item_gained / player_joined / player_left |
+| `pong` | ping 응답 |
+
+## 현재 구현 기능
+
+- [x] 서버 권위 플레이어 이동 (WASD·방향키)
+- [x] 자원 채집 (거리·쿨타임·스태미나 검증)
+- [x] nearest-resource fallback (resourceId 없거나 invalid 시)
+- [x] 자원 리스폰 (tree 25s / stone 35s)
+- [x] 몬스터 AI (wild_slime chase/idle)
+- [x] snapshot broadcast 20Hz
+- [x] 메시지 rate limit (120msg/s per socket)
+- [x] 이벤트: resource_hit / resource_destroyed / item_gained / player_joined / player_left
+- [x] ResourceSnapshot.alive 필드
+
+## 문제 해결
+
+**WebSocket 연결 불가:**
+- `wrangler.toml`의 Durable Object binding 확인 (`GAME_ROOM`)
+- `wrangler dev` 로컬 실행 후 `GET /health` 접근 확인
+
+**채집이 안 됨:**
+- gatherRange(80)보다 가까이 있는지 확인
+- stamina가 0인지 확인 (stamina < 8이면 거부)
+- 서버 로그에서 gather 결과 확인
 
 ## TODO
 
-- 플레이어 인증/세션을 D1에 연결
-- 자원/몬스터 시드 데이터 D1 영구화
-- 전투(공격 입력 → 데미지) 시스템
-- 룸 샤딩 (worldId / partyId)
-- snapshot delta 압축
+- [ ] 전투 시스템 (몬스터 근접 공격)
+- [ ] 플레이어 데미지 / 사망 / 리스폰
+- [ ] 영속 데이터 (D1 저장)
+- [ ] 인증 / 세션 토큰
+- [ ] 멀티 룸 지원
+- [ ] Cloudflare 로그 기반 모니터링
