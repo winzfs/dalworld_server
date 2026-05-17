@@ -1,3 +1,4 @@
+import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
 import { distance, randomRange } from '../utils/math';
@@ -9,10 +10,10 @@ import {
   type WorldState,
 } from './WorldState';
 
-export const GATHER_RANGE = 80;
-export const GATHER_COOLDOWN_MS = 400;
-export const GATHER_DAMAGE = 25;
-export const STAMINA_COST_PER_GATHER = 8;
+export const GATHER_RANGE = GAME_CONFIG.resource.gatherRange;
+export const GATHER_COOLDOWN_MS = GAME_CONFIG.resource.gatherCooldownMs;
+export const GATHER_DAMAGE = GAME_CONFIG.resource.gatherDamage;
+export const STAMINA_COST_PER_GATHER = GAME_CONFIG.resource.staminaCostPerGather;
 
 type ResourceTemplate = {
   type: ResourceType;
@@ -22,10 +23,7 @@ type ResourceTemplate = {
   respawnMs: number;
 };
 
-const TEMPLATES: Record<ResourceType, ResourceTemplate> = {
-  tree: { type: 'tree', maxHp: 75, drop: 'wood', dropAmount: 3, respawnMs: 25_000 },
-  stone: { type: 'stone', maxHp: 100, drop: 'stone', dropAmount: 2, respawnMs: 35_000 },
-};
+const TEMPLATES: Record<ResourceType, ResourceTemplate> = GAME_CONFIG.resource.templates;
 
 export type GatherResult =
   | { ok: true; destroyed: boolean; resource: ResourceEntity }
