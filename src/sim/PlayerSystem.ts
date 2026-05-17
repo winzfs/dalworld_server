@@ -1,3 +1,4 @@
+import { GAME_CONFIG } from '../config/gameConfig';
 import type { Facing, MovementKeys } from '../protocol/messages';
 import { clamp, normalize } from '../utils/math';
 import {
@@ -8,10 +9,10 @@ import {
   type WorldState,
 } from './WorldState';
 
-export const PLAYER_SPEED = 220;
-export const PLAYER_MAX_HP = 100;
-export const PLAYER_MAX_STAMINA = 100;
-export const STAMINA_REGEN_PER_SEC = 12;
+export const PLAYER_SPEED = GAME_CONFIG.player.speed;
+export const PLAYER_MAX_HP = GAME_CONFIG.player.maxHp;
+export const PLAYER_MAX_STAMINA = GAME_CONFIG.player.maxStamina;
+export const STAMINA_REGEN_PER_SEC = GAME_CONFIG.player.staminaRegenPerSec;
 
 export function createPlayer(id: string): PlayerEntity {
   return {
