@@ -1,3 +1,4 @@
+import { GAME_CONFIG } from '../config/gameConfig';
 import type { MonsterType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
@@ -17,15 +18,7 @@ type MonsterTemplate = {
   loseRange: number;
 };
 
-const TEMPLATES: Record<MonsterType, MonsterTemplate> = {
-  wild_slime: {
-    type: 'wild_slime',
-    hp: 50,
-    speed: 80,
-    detectRange: 250,
-    loseRange: 450,
-  },
-};
+const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
