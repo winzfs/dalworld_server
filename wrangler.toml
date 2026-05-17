@@ -1,6 +1,10 @@
 name = "dalworld-server"
 main = "src/index.ts"
 compatibility_date = "2026-05-17"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
 
 [[durable_objects.bindings]]
 name = "GAME_ROOM"
@@ -13,4 +17,5 @@ new_sqlite_classes = ["GameRoom"]
 [[d1_databases]]
 binding = "DB"
 database_name = "dalworld-db"
-database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
+database_id = "c8a982fe-cd6e-4a89-b169-6d5e58bc8b41"
+migrations_dir = "migrations"

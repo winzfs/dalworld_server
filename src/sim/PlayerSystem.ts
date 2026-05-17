@@ -1,0 +1,84 @@
+import type { Facing, MovementKeys } from '../protocol/messages';
+import { clamp, normalize } from '../utils/math';
+import {
+  WORLD_HEIGHT,
+  WORLD_WIDTH,
+  PLAYER_RADIUS,
+  type PlayerEntity,
+  type WorldState,
+} from './WorldState';
+
+export const PLAYER_SPEED = 220;
+export const PLAYER_MAX_HP = 100;
+export const PLAYER_MAX_STAMINA = 100;
+export const STAMINA_REGEN_PER_SEC = 12;
+
+export function createPlayer(id: string): PlayerEntity {
+  return {
+    id,
+    x: WORLD_WIDTH / 2,
+    y: WORLD_HEIGHT / 2,
+    hp: PLAYER_MAX_HP,
+    maxHp: PLAYER_MAX_HP,
+    stamina: PLAYER_MAX_STAMINA,
+    maxStamina: PLAYER_MAX_STAMINA,
+    facing: 'down',
+    lastInputSeq: 0,
+    inventory: { wood: 0, stone: 0 },
+    input: { up: false, down: false, left: false, right: false },
+    nextGatherAt: 0,
+  };
+}
+
+export function applyInput(
+  player: PlayerEntity,
+  seq: number,
+  keys: MovementKeys,
+  facing: Facing | undefined,
+): void {
+  if (seq <= player.lastInputSeq) return;
+  player.lastInputSeq = seq;
+  player.input = {
+    up: keys.up === true,
+    down: keys.down === true,
+    left: keys.left === true,
+    right: keys.right === true,
+  };
+  if (facing) player.facing = facing;
+}
+
+export class PlayerSystem {
+  update(world: WorldState, dt: number): void {
+    for (const player of world.players.values()) {
+      this.movePlayer(player, dt);
+      this.regenerate(player, dt);
+    }
+  }
+
+  private movePlayer(player: PlayerEntity, dt: number): void {
+    let dx = 0;
+    let dy = 0;
+    if (player.input.left) dx -= 1;
+    if (player.input.right) dx += 1;
+    if (player.input.up) dy -= 1;
+    if (player.input.down) dy += 1;
+
+    if (dx === 0 && dy === 0) return;
+
+    const direction = normalize(dx, dy);
+    player.x = clamp(player.x + direction.x * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
+    player.y = clamp(player.y + direction.y * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+
+    if (Math.abs(direction.x) > Math.abs(direction.y)) {
+      player.facing = direction.x > 0 ? 'right' : 'left';
+    } else {
+      player.facing = direction.y > 0 ? 'down' : 'up';
+    }
+  }
+
+  private regenerate(player: PlayerEntity, dt: number): void {
+    if (player.stamina < player.maxStamina) {
+      player.stamina = Math.min(player.maxStamina, player.stamina + STAMINA_REGEN_PER_SEC * dt);
+    }
+  }
+}
