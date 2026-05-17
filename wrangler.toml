@@ -1,0 +1,16 @@
+name = "dalworld-server"
+main = "src/index.ts"
+compatibility_date = "2026-05-17"
+
+[[durable_objects.bindings]]
+name = "GAME_ROOM"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["GameRoom"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "dalworld-db"
+database_id = "REPLACE_WITH_CLOUDFLARE_D1_DATABASE_ID"
