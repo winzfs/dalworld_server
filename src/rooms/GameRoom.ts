@@ -8,6 +8,8 @@ import type {
 } from '../protocol/messages';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
+import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
+import { clamp } from '../utils/math';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
@@ -74,6 +76,10 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'input':
         applyInput(player, message.seq, message.keys, message.facing);
+        if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
+          player.x = clamp(message.clientX ?? player.x, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
+          player.y = clamp(message.clientY ?? player.y, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+        }
         return;
       case 'gather': {
         const result = this.simulation.resources.gather(
