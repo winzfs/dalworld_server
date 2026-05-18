@@ -1,3 +1,5 @@
+import type { GameWorldMap } from '../worldMap/types';
+
 export type MovementKeys = {
   up: boolean;
   down: boolean;
@@ -37,9 +39,7 @@ export type ResourceSnapshot = {
   y: number;
   hp: number;
   maxHp: number;
-  /** 0 if alive, otherwise epoch ms when it will respawn */
   respawnAt: number;
-  /** true when the resource is harvestable (hp > 0 and not waiting to respawn) */
   alive: boolean;
 };
 
@@ -78,15 +78,12 @@ export type ClientToServerMessage =
       seq: number;
       keys: MovementKeys;
       facing?: Facing;
-      /** Client-authored position for immediate-feel movement. Server clamps to world bounds. */
       clientX?: number;
-      /** Client-authored position for immediate-feel movement. Server clamps to world bounds. */
       clientY?: number;
     }
   | {
       type: 'gather';
       seq: number;
-      /** Preferred target; server picks nearest in range when omitted or invalid. */
       resourceId?: string;
     }
   | { type: 'ping'; now: number };
@@ -104,6 +101,7 @@ export type ServerToClientMessage =
       playerId: string;
       world: WorldInfo;
       gameplay: PublicGameplayConfig;
+      map?: GameWorldMap | null;
       serverTime: number;
     }
   | {
