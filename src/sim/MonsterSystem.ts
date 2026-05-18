@@ -20,10 +20,19 @@ type MonsterTemplate = {
 
 const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
 const SPAWN_TYPES: MonsterType[] = ['wild_slime', 'sheep'];
+const START_AREA_SHEEP_COUNT = 3;
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
-    for (let i = 0; i < count; i++) {
+    const centerX = WORLD_WIDTH / 2;
+    const centerY = WORLD_HEIGHT / 2;
+
+    for (let i = 0; i < Math.min(START_AREA_SHEEP_COUNT, count); i++) {
+      const monster = this.spawnAt('sheep', centerX + 120 + i * 56, centerY + 80 + i * 24);
+      world.monsters.set(monster.id, monster);
+    }
+
+    for (let i = START_AREA_SHEEP_COUNT; i < count; i++) {
       const type = SPAWN_TYPES[i % SPAWN_TYPES.length];
       const monster = this.spawn(type);
       world.monsters.set(monster.id, monster);
@@ -74,12 +83,20 @@ export class MonsterSystem {
   }
 
   private spawn(type: MonsterType): MonsterEntity {
+    return this.spawnAt(
+      type,
+      randomRange(200, WORLD_WIDTH - 200),
+      randomRange(200, WORLD_HEIGHT - 200),
+    );
+  }
+
+  private spawnAt(type: MonsterType, x: number, y: number): MonsterEntity {
     const template = TEMPLATES[type];
     return {
       id: shortId('mob'),
       type,
-      x: randomRange(200, WORLD_WIDTH - 200),
-      y: randomRange(200, WORLD_HEIGHT - 200),
+      x: clamp(x, 0, WORLD_WIDTH),
+      y: clamp(y, 0, WORLD_HEIGHT),
       hp: template.hp,
       maxHp: template.hp,
       state: 'idle',
