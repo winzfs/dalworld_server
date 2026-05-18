@@ -2,6 +2,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
 import { distance, randomRange } from '../utils/math';
+import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
 import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
@@ -31,13 +32,30 @@ export type GatherResult =
 
 export class ResourceSystem {
   seed(world: WorldState, treeCount: number, stoneCount: number): void {
+    if (world.resources.size > 0) return;
+
     for (let i = 0; i < treeCount; i++) {
-      const node = this.spawn('tree');
+      const node = this.spawnRandom('tree', i);
       world.resources.set(node.id, node);
     }
     for (let i = 0; i < stoneCount; i++) {
-      const node = this.spawn('stone');
+      const node = this.spawnRandom('stone', i);
       world.resources.set(node.id, node);
+    }
+  }
+
+  seedFromWorldMap(world: WorldState, map: GameWorldMap | null | undefined): void {
+    if (!map) return;
+
+    world.resources.clear();
+
+    for (const cell of map.cells) {
+      for (const placement of cell.placements) {
+        const resource = this.createFromPlacement(cell.gridX, cell.gridY, placement);
+        if (resource) {
+          world.resources.set(resource.id, resource);
+        }
+      }
     }
   }
 
@@ -47,9 +65,6 @@ export class ResourceSystem {
         const template = TEMPLATES[resource.type];
         resource.hp = template.maxHp;
         resource.respawnAt = 0;
-        const pos = randomPosition();
-        resource.x = pos.x;
-        resource.y = pos.y;
       }
     }
   }
@@ -67,17 +82,24 @@ export class ResourceSystem {
       return { ok: false, reason: 'no_stamina' };
     }
 
-    // Resolve target: use provided ID or fall back to nearest alive resource in range.
+    // Resolve target: use provided ID or fall back to nearest alive resource in range inside the player's current cell.
     let resource: ResourceEntity | undefined;
     if (resourceId) {
       const candidate = world.resources.get(resourceId);
-      if (candidate && candidate.respawnAt === 0 && candidate.hp > 0) {
+      if (
+        candidate &&
+        candidate.cellX === player.cellX &&
+        candidate.cellY === player.cellY &&
+        candidate.respawnAt === 0 &&
+        candidate.hp > 0
+      ) {
         resource = candidate;
       }
     }
     if (!resource) {
       let nearestDist = GATHER_RANGE;
       for (const r of world.resources.values()) {
+        if (r.cellX !== player.cellX || r.cellY !== player.cellY) continue;
         if (r.respawnAt !== 0 || r.hp <= 0) continue;
         const d = distance(player.x, player.y, r.x, r.y);
         if (d < nearestDist) {
@@ -126,12 +148,36 @@ export class ResourceSystem {
     return { ok: true, destroyed: false, resource };
   }
 
-  private spawn(type: ResourceType): ResourceEntity {
+  private createFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): ResourceEntity | null {
+    if (placement.gameplay?.kind !== 'resource') return null;
+
+    const type = placement.gameplay.resourceType;
+    const template = TEMPLATES[type];
+    if (!template) return null;
+
+    const maxHp = normalizePositiveNumber(placement.gameplay.maxHp, template.maxHp);
+
+    return {
+      id: `map-resource:${cellX}:${cellY}:${placement.id}`,
+      type,
+      cellX,
+      cellY,
+      x: placement.x,
+      y: placement.y,
+      hp: maxHp,
+      maxHp,
+      respawnAt: 0,
+    };
+  }
+
+  private spawnRandom(type: ResourceType, index: number): ResourceEntity {
     const template = TEMPLATES[type];
     const pos = randomPosition();
     return {
-      id: shortId(type),
+      id: `${shortId(type)}-${index}`,
       type,
+      cellX: 0,
+      cellY: 0,
       x: pos.x,
       y: pos.y,
       hp: template.maxHp,
@@ -147,4 +193,8 @@ function randomPosition(): { x: number; y: number } {
     x: randomRange(margin, WORLD_WIDTH - margin),
     y: randomRange(margin, WORLD_HEIGHT - margin),
   };
+}
+
+function normalizePositiveNumber(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value as number) > 0 ? (value as number) : fallback;
 }
