@@ -19,6 +19,8 @@ export type PlayerEntity = {
   id: string;
   x: number;
   y: number;
+  cellX: number;
+  cellY: number;
   hp: number;
   maxHp: number;
   stamina: number;
@@ -80,6 +82,8 @@ export class WorldState {
       id: p.id,
       x: p.x,
       y: p.y,
+      cellX: p.cellX,
+      cellY: p.cellY,
       hp: p.hp,
       maxHp: p.maxHp,
       stamina: p.stamina,
