@@ -60,6 +60,13 @@ export const GAME_CONFIG = {
         detectRange: 250,
         loseRange: 450,
       },
+      sheep: {
+        type: 'sheep',
+        hp: 35,
+        speed: 65,
+        detectRange: 180,
+        loseRange: 320,
+      },
     } satisfies Record<
       MonsterType,
       {
