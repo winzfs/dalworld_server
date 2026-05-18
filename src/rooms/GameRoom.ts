@@ -10,7 +10,7 @@ import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
 import { clamp } from '../utils/math';
-import { canCircleOccupyWorldMap } from '../worldMap/runtimeWorldMap';
+import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
@@ -116,7 +116,7 @@ export class GameRoom extends DurableObject<Env> {
           const nextX = clamp(message.clientX ?? player.x, 0, cellSize);
           const nextY = clamp(message.clientY ?? player.y, 0, cellSize);
 
-          if (canCircleOccupyWorldMap(this.worldMap, nextX, nextY, PLAYER_RADIUS)) {
+          if (canCircleOccupyCell(this.worldMap, player.cellX, player.cellY, nextX, nextY, PLAYER_RADIUS)) {
             player.x = nextX;
             player.y = nextY;
           }
