@@ -3,26 +3,34 @@ import { GameRoom } from './rooms/GameRoom';
 
 export { GameRoom };
 
-const MAP_STORAGE_KEY = 'world:default-map';
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
     if (url.pathname === '/maps/default') {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: CORS_HEADERS });
+      }
+
       const id = env.GAME_ROOM.idFromName('main-world');
       const room = env.GAME_ROOM.get(id);
 
       if (request.method === 'GET') {
-        return room.fetch(new Request('https://internal/maps/default'));
+        return withCors(await room.fetch(new Request('https://internal/maps/default')));
       }
 
       if (request.method === 'PUT') {
-        return room.fetch(new Request('https://internal/maps/default', {
+        return withCors(await room.fetch(new Request('https://internal/maps/default', {
           method: 'PUT',
           body: request.body,
           headers: request.headers,
-        }));
+        })));
       }
     }
 
@@ -46,3 +54,17 @@ export default {
     });
   },
 } satisfies ExportedHandler<Env>;
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+
+  for (const [key, value] of Object.entries(CORS_HEADERS)) {
+    headers.set(key, value);
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
