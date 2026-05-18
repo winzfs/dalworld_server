@@ -60,26 +60,31 @@ export class MonsterSystem {
     monster.state = 'chase';
 
     const direction = normalize(target.x - monster.x, target.y - monster.y);
+    const deltaX = direction.x * monster.speed * dt;
+    const deltaY = direction.y * monster.speed * dt;
+
     const nextX = clamp(
-      monster.x + direction.x * monster.speed * dt,
+      monster.x + deltaX,
       MONSTER_COLLISION_RADIUS,
       WORLD_WIDTH - MONSTER_COLLISION_RADIUS,
     );
+    if (this.canOccupy(monster, nextX, monster.y, world)) {
+      monster.x = nextX;
+    }
+
     const nextY = clamp(
-      monster.y + direction.y * monster.speed * dt,
+      monster.y + deltaY,
       MONSTER_COLLISION_RADIUS,
       WORLD_HEIGHT - MONSTER_COLLISION_RADIUS,
     );
-
-    if (this.canMoveTo(monster, nextX, nextY, world)) {
-      monster.x = nextX;
+    if (this.canOccupy(monster, monster.x, nextY, world)) {
       monster.y = nextY;
     }
   }
 
-  private canMoveTo(monster: MonsterEntity, nextX: number, nextY: number, world: WorldState): boolean {
+  private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState): boolean {
     for (const player of world.players.values()) {
-      if (circlesOverlap(nextX, nextY, MONSTER_COLLISION_RADIUS, player.x, player.y, PLAYER_RADIUS)) {
+      if (circlesOverlap(x, y, MONSTER_COLLISION_RADIUS, player.x, player.y, PLAYER_RADIUS)) {
         return false;
       }
     }
@@ -88,8 +93,8 @@ export class MonsterSystem {
       if (other.id === monster.id) continue;
 
       if (circlesOverlap(
-        nextX,
-        nextY,
+        x,
+        y,
         MONSTER_COLLISION_RADIUS,
         other.x,
         other.y,
