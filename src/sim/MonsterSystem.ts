@@ -1,4 +1,5 @@
 import { GAME_CONFIG } from '../config/gameConfig';
+import { getMonsterCollisionConfig } from '../config/monsterCollisionConfig';
 import type { MonsterType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
@@ -19,10 +20,15 @@ type MonsterTemplate = {
   loseRange: number;
 };
 
+type CollisionCircle = {
+  x: number;
+  y: number;
+  radius: number;
+};
+
 const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
 const SPAWN_TYPES: MonsterType[] = ['wild_slime', 'sheep'];
 const START_AREA_SHEEP_COUNT = 3;
-const MONSTER_COLLISION_RADIUS = 40;
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
@@ -59,32 +65,37 @@ export class MonsterSystem {
     monster.targetPlayerId = target.id;
     monster.state = 'chase';
 
+    const collision = getMonsterCollisionConfig(monster.type);
     const direction = normalize(target.x - monster.x, target.y - monster.y);
     const deltaX = direction.x * monster.speed * dt;
     const deltaY = direction.y * monster.speed * dt;
 
     const nextX = clamp(
       monster.x + deltaX,
-      MONSTER_COLLISION_RADIUS,
-      WORLD_WIDTH - MONSTER_COLLISION_RADIUS,
+      collision.radius,
+      WORLD_WIDTH - collision.radius,
     );
+
     if (this.canOccupy(monster, nextX, monster.y, world)) {
       monster.x = nextX;
     }
 
     const nextY = clamp(
       monster.y + deltaY,
-      MONSTER_COLLISION_RADIUS,
-      WORLD_HEIGHT - MONSTER_COLLISION_RADIUS,
+      collision.radius,
+      WORLD_HEIGHT - collision.radius,
     );
+
     if (this.canOccupy(monster, monster.x, nextY, world)) {
       monster.y = nextY;
     }
   }
 
   private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState): boolean {
+    const selfCircle = getCollisionCircle(monster.type, x, y);
+
     for (const player of world.players.values()) {
-      if (circlesOverlap(x, y, MONSTER_COLLISION_RADIUS, player.x, player.y, PLAYER_RADIUS)) {
+      if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, player.x, player.y, PLAYER_RADIUS)) {
         return false;
       }
     }
@@ -92,14 +103,18 @@ export class MonsterSystem {
     for (const other of world.monsters.values()) {
       if (other.id === monster.id) continue;
 
-      if (circlesOverlap(
-        x,
-        y,
-        MONSTER_COLLISION_RADIUS,
-        other.x,
-        other.y,
-        MONSTER_COLLISION_RADIUS,
-      )) {
+      const otherCircle = getCollisionCircle(other.type, other.x, other.y);
+
+      if (
+        circlesOverlap(
+          selfCircle.x,
+          selfCircle.y,
+          selfCircle.radius,
+          otherCircle.x,
+          otherCircle.y,
+          otherCircle.radius,
+        )
+      ) {
         return false;
       }
     }
@@ -117,6 +132,7 @@ export class MonsterSystem {
 
     let closest: PlayerEntity | null = null;
     let closestDist = monster.detectRange;
+
     for (const player of world.players.values()) {
       const d = distance(monster.x, monster.y, player.x, player.y);
       if (d <= closestDist) {
@@ -124,6 +140,7 @@ export class MonsterSystem {
         closestDist = d;
       }
     }
+
     return closest;
   }
 
@@ -137,11 +154,13 @@ export class MonsterSystem {
 
   private spawnAt(type: MonsterType, x: number, y: number): MonsterEntity {
     const template = TEMPLATES[type];
+    const collision = getMonsterCollisionConfig(type);
+
     return {
       id: shortId('mob'),
       type,
-      x: clamp(x, MONSTER_COLLISION_RADIUS, WORLD_WIDTH - MONSTER_COLLISION_RADIUS),
-      y: clamp(y, MONSTER_COLLISION_RADIUS, WORLD_HEIGHT - MONSTER_COLLISION_RADIUS),
+      x: clamp(x, collision.radius, WORLD_WIDTH - collision.radius),
+      y: clamp(y, collision.radius, WORLD_HEIGHT - collision.radius),
       hp: template.hp,
       maxHp: template.hp,
       state: 'idle',
@@ -151,6 +170,16 @@ export class MonsterSystem {
       loseRange: template.loseRange,
     };
   }
+}
+
+function getCollisionCircle(type: MonsterType, x: number, y: number): CollisionCircle {
+  const collision = getMonsterCollisionConfig(type);
+
+  return {
+    x: x + collision.offsetX,
+    y: y + collision.offsetY,
+    radius: collision.radius,
+  };
 }
 
 function circlesOverlap(
