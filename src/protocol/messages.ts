@@ -62,6 +62,7 @@ export type WorldInfo = {
 
 export type PublicGameplayConfig = {
   playerRadius: number;
+  playerSpeed: number;
   gatherRange: number;
 };
 
@@ -77,6 +78,10 @@ export type ClientToServerMessage =
       seq: number;
       keys: MovementKeys;
       facing?: Facing;
+      /** Client-authored position for immediate-feel movement. Server clamps to world bounds. */
+      clientX?: number;
+      /** Client-authored position for immediate-feel movement. Server clamps to world bounds. */
+      clientY?: number;
     }
   | {
       type: 'gather';
