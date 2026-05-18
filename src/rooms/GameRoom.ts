@@ -10,9 +10,11 @@ import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
 import { clamp } from '../utils/math';
+import type { GameWorldMap } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
+const MAP_STORAGE_KEY = 'world:default-map';
 
 type RateLimitEntry = { count: number; resetAt: number };
 
@@ -23,7 +25,22 @@ export class GameRoom extends DurableObject<Env> {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
 
-  async fetch(_request: Request): Promise<Response> {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/maps/default') {
+      if (request.method === 'GET') {
+        const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
+        return Response.json(map ?? null);
+      }
+
+      if (request.method === 'PUT') {
+        const map = await request.json<GameWorldMap>();
+        await this.ctx.storage.put(MAP_STORAGE_KEY, map);
+        return Response.json({ ok: true });
+      }
+    }
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
@@ -34,13 +51,16 @@ export class GameRoom extends DurableObject<Env> {
 
     const now = Date.now();
     const publicConfig = getPublicGameConfig();
+    const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
+
     this.send(server, {
       type: 'welcome',
       playerId,
       world: publicConfig.world,
       gameplay: publicConfig.gameplay,
+      map,
       serverTime: now,
-    });
+    } as ServerToClientMessage);
 
     this.simulation.world.pushEvent({ type: 'player_joined', playerId });
     this.ensureLoop();
