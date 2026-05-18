@@ -34,14 +34,14 @@ export class GameRoom extends DurableObject<Env> {
     if (url.pathname === '/maps/default') {
       if (request.method === 'GET') {
         const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
-        this.worldMap = map ?? null;
+        this.setWorldMap(map ?? null);
         return Response.json(map ?? null);
       }
 
       if (request.method === 'PUT') {
         const map = await request.json<GameWorldMap>();
         await this.ctx.storage.put(MAP_STORAGE_KEY, map);
-        this.worldMap = map;
+        this.setWorldMap(map);
         return Response.json({ ok: true });
       }
     }
@@ -58,7 +58,7 @@ export class GameRoom extends DurableObject<Env> {
     const publicConfig = getPublicGameConfig();
 
     if (!this.worldMap) {
-      this.worldMap = (await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY)) ?? null;
+      this.setWorldMap((await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY)) ?? null);
     }
 
     this.send(server, {
@@ -79,6 +79,11 @@ export class GameRoom extends DurableObject<Env> {
     server.addEventListener('error', () => this.closeSession(server));
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private setWorldMap(map: GameWorldMap | null): void {
+    this.worldMap = map;
+    this.simulation.resources.seedFromWorldMap(this.simulation.world, map);
   }
 
   private handleMessage(socket: WebSocket, raw: string | ArrayBuffer): void {
