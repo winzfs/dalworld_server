@@ -39,6 +39,8 @@ export type ResourceSnapshot = {
   type: ResourceType;
   x: number;
   y: number;
+  cellX: number;
+  cellY: number;
   hp: number;
   maxHp: number;
   respawnAt: number;
