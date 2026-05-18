@@ -88,6 +88,7 @@ export function getPublicGameConfig() {
     },
     gameplay: {
       playerRadius: GAME_CONFIG.player.radius,
+      playerSpeed: GAME_CONFIG.player.speed,
       gatherRange: GAME_CONFIG.resource.gatherRange,
     },
   };
