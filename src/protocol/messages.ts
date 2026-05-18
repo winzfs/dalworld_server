@@ -102,6 +102,7 @@ export type ServerEvent =
 export type ServerToClientMessage =
   | {
       type: 'welcome';
+      protocolVersion: number;
       playerId: string;
       world: WorldInfo;
       gameplay: PublicGameplayConfig;
