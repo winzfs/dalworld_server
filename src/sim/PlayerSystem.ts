@@ -19,6 +19,8 @@ export function createPlayer(id: string): PlayerEntity {
     id,
     x: WORLD_WIDTH / 2,
     y: WORLD_HEIGHT / 2,
+    cellX: 0,
+    cellY: 0,
     hp: PLAYER_MAX_HP,
     maxHp: PLAYER_MAX_HP,
     stamina: PLAYER_MAX_STAMINA,
