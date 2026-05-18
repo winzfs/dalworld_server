@@ -3,9 +3,28 @@ import { GameRoom } from './rooms/GameRoom';
 
 export { GameRoom };
 
+const MAP_STORAGE_KEY = 'world:default-map';
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === '/maps/default') {
+      const id = env.GAME_ROOM.idFromName('main-world');
+      const room = env.GAME_ROOM.get(id);
+
+      if (request.method === 'GET') {
+        return room.fetch(new Request('https://internal/maps/default'));
+      }
+
+      if (request.method === 'PUT') {
+        return room.fetch(new Request('https://internal/maps/default', {
+          method: 'PUT',
+          body: request.body,
+          headers: request.headers,
+        }));
+      }
+    }
 
     if (url.pathname === '/ws') {
       if (request.headers.get('Upgrade') !== 'websocket') {
