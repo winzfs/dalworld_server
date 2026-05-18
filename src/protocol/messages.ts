@@ -23,6 +23,8 @@ export type PlayerSnapshot = {
   id: string;
   x: number;
   y: number;
+  cellX: number;
+  cellY: number;
   hp: number;
   maxHp: number;
   stamina: number;
@@ -80,6 +82,8 @@ export type ClientToServerMessage =
       facing?: Facing;
       clientX?: number;
       clientY?: number;
+      cellX?: number;
+      cellY?: number;
     }
   | {
       type: 'gather';
