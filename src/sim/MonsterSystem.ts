@@ -19,11 +19,13 @@ type MonsterTemplate = {
 };
 
 const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
+const SPAWN_TYPES: MonsterType[] = ['wild_slime', 'sheep'];
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
     for (let i = 0; i < count; i++) {
-      const monster = this.spawn('wild_slime');
+      const type = SPAWN_TYPES[i % SPAWN_TYPES.length];
+      const monster = this.spawn(type);
       world.monsters.set(monster.id, monster);
     }
   }
