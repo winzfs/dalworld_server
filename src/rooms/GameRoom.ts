@@ -74,13 +74,17 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'hello':
         return;
-      case 'input':
+      case 'input': {
         applyInput(player, message.seq, message.keys, message.facing);
+
         if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
           player.x = clamp(message.clientX ?? player.x, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
           player.y = clamp(message.clientY ?? player.y, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+          player.input = { up: false, down: false, left: false, right: false };
         }
+
         return;
+      }
       case 'gather': {
         const result = this.simulation.resources.gather(
           this.simulation.world,
