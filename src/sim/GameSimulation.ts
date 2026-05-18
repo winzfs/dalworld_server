@@ -29,6 +29,8 @@ export class GameSimulation {
       type: r.type,
       x: r.x,
       y: r.y,
+      cellX: r.cellX,
+      cellY: r.cellY,
       hp: r.hp,
       maxHp: r.maxHp,
       respawnAt: r.respawnAt,
