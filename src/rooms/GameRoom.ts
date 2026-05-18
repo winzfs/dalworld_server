@@ -104,9 +104,17 @@ export class GameRoom extends DurableObject<Env> {
       case 'input': {
         applyInput(player, message.seq, message.keys, message.facing);
 
+        if (Number.isFinite(message.cellX)) {
+          player.cellX = Math.trunc(message.cellX ?? player.cellX);
+        }
+        if (Number.isFinite(message.cellY)) {
+          player.cellY = Math.trunc(message.cellY ?? player.cellY);
+        }
+
         if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
-          const nextX = clamp(message.clientX ?? player.x, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
-          const nextY = clamp(message.clientY ?? player.y, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+          const cellSize = this.worldMap?.cellSize ?? WORLD_WIDTH;
+          const nextX = clamp(message.clientX ?? player.x, 0, cellSize);
+          const nextY = clamp(message.clientY ?? player.y, 0, cellSize);
 
           if (canCircleOccupyWorldMap(this.worldMap, nextX, nextY, PLAYER_RADIUS)) {
             player.x = nextX;
