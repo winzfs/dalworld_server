@@ -6,6 +6,7 @@ import type {
   ServerEvent,
   ServerToClientMessage,
 } from '../protocol/messages';
+import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
@@ -62,6 +63,7 @@ export class GameRoom extends DurableObject<Env> {
 
     this.send(server, {
       type: 'welcome',
+      protocolVersion: PROTOCOL_VERSION,
       playerId,
       world: publicConfig.world,
       gameplay: publicConfig.gameplay,
