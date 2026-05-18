@@ -10,6 +10,7 @@ import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
 import { clamp } from '../utils/math';
+import { canCircleOccupyWorldMap } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
@@ -24,6 +25,7 @@ export class GameRoom extends DurableObject<Env> {
   private readonly rateLimits = new Map<WebSocket, RateLimitEntry>();
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
+  private worldMap: GameWorldMap | null = null;
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -31,12 +33,14 @@ export class GameRoom extends DurableObject<Env> {
     if (url.pathname === '/maps/default') {
       if (request.method === 'GET') {
         const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
+        this.worldMap = map ?? null;
         return Response.json(map ?? null);
       }
 
       if (request.method === 'PUT') {
         const map = await request.json<GameWorldMap>();
         await this.ctx.storage.put(MAP_STORAGE_KEY, map);
+        this.worldMap = map;
         return Response.json({ ok: true });
       }
     }
@@ -51,16 +55,19 @@ export class GameRoom extends DurableObject<Env> {
 
     const now = Date.now();
     const publicConfig = getPublicGameConfig();
-    const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
+
+    if (!this.worldMap) {
+      this.worldMap = (await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY)) ?? null;
+    }
 
     this.send(server, {
       type: 'welcome',
       playerId,
       world: publicConfig.world,
       gameplay: publicConfig.gameplay,
-      map,
+      map: this.worldMap,
       serverTime: now,
-    } as ServerToClientMessage);
+    });
 
     this.simulation.world.pushEvent({ type: 'player_joined', playerId });
     this.ensureLoop();
@@ -98,8 +105,14 @@ export class GameRoom extends DurableObject<Env> {
         applyInput(player, message.seq, message.keys, message.facing);
 
         if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
-          player.x = clamp(message.clientX ?? player.x, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
-          player.y = clamp(message.clientY ?? player.y, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+          const nextX = clamp(message.clientX ?? player.x, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
+          const nextY = clamp(message.clientY ?? player.y, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+
+          if (canCircleOccupyWorldMap(this.worldMap, nextX, nextY, PLAYER_RADIUS)) {
+            player.x = nextX;
+            player.y = nextY;
+          }
+
           player.input = { up: false, down: false, left: false, right: false };
         }
 
