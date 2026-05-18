@@ -38,6 +38,8 @@ export type ResourceEntity = {
   type: ResourceType;
   x: number;
   y: number;
+  cellX: number;
+  cellY: number;
   hp: number;
   maxHp: number;
   /** 0 = alive, otherwise epoch ms when it respawns */
