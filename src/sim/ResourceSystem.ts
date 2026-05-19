@@ -161,6 +161,7 @@ export class ResourceSystem {
       type,
       cellX,
       cellY,
+      assetUrl: placement.assetUrl,
       x: placement.x,
       y: placement.y,
       hp: maxHp,
