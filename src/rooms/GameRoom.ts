@@ -9,7 +9,7 @@ import type {
 import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
-import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState';
+import { PLAYER_RADIUS, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState';
 import { BuildingGrid } from '../systems/building/BuildingGrid';
 import { BuildingService } from '../systems/building/BuildingService';
 import type { BuildingSnapshot } from '../systems/building/BuildingTypes';
@@ -18,17 +18,27 @@ import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
-import type { GameWorldMap } from '../worldMap/types';
+import type { GameWorldMap, WorldMapCell } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
 const MAP_STORAGE_KEY = 'world:default-map';
+const MAP_MANIFEST_STORAGE_KEY = 'world:default-map:manifest';
+const MAP_CELL_STORAGE_PREFIX = 'world:default-map:cell:';
 const BUILDING_STORAGE_KEY = 'world:buildings';
 const BUILDING_GRID_WIDTH = 256;
 const BUILDING_GRID_HEIGHT = 256;
 const BUILDING_GRID_MAX_Z = 8;
 
 type RateLimitEntry = { count: number; resetAt: number };
+
+type WorldMapManifest = {
+  version: 1;
+  name: string;
+  tileSize: number;
+  cellSize: number;
+  cells: Array<{ gridX: number; gridY: number }>;
+};
 
 export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
@@ -50,17 +60,41 @@ export class GameRoom extends DurableObject<Env> {
 
     if (url.pathname === '/maps/default') {
       if (request.method === 'GET') {
-        const map = await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY);
-        this.setWorldMap(map ?? null);
-        return Response.json(map ?? null);
+        const map = await this.loadWorldMapFromStorage();
+        this.setWorldMap(map);
+        return Response.json(map);
       }
 
       if (request.method === 'PUT') {
         const map = await request.json<GameWorldMap>();
-        await this.ctx.storage.put(MAP_STORAGE_KEY, map);
+        await this.saveWorldMapAsChunks(map);
         this.setWorldMap(map);
         return Response.json({ ok: true });
       }
+    }
+
+    if (url.pathname === '/maps/default/cell' && request.method === 'PUT') {
+      const gridX = Number(url.searchParams.get('gridX'));
+      const gridY = Number(url.searchParams.get('gridY'));
+      if (!Number.isInteger(gridX) || !Number.isInteger(gridY)) {
+        return Response.json({ ok: false, reason: 'gridX/gridY must be integers' }, { status: 400 });
+      }
+
+      const cell = await request.json<WorldMapCell>();
+      await this.ctx.storage.put(mapCellStorageKey(gridX, gridY), {
+        ...cell,
+        gridX,
+        gridY,
+      });
+      return Response.json({ ok: true });
+    }
+
+    if (url.pathname === '/maps/default/manifest' && request.method === 'PUT') {
+      const manifest = await request.json<WorldMapManifest>();
+      await this.ctx.storage.put(MAP_MANIFEST_STORAGE_KEY, manifest);
+      const map = await this.loadWorldMapFromStorage();
+      this.setWorldMap(map);
+      return Response.json({ ok: true });
     }
 
     await this.loadBuildingsIfNeeded();
@@ -77,7 +111,7 @@ export class GameRoom extends DurableObject<Env> {
     const publicConfig = getPublicGameConfig();
 
     if (!this.worldMap) {
-      this.setWorldMap((await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY)) ?? null);
+      this.setWorldMap(await this.loadWorldMapFromStorage());
     }
 
     this.send(server, {
@@ -108,6 +142,43 @@ export class GameRoom extends DurableObject<Env> {
   private setWorldMap(map: GameWorldMap | null): void {
     this.worldMap = map;
     this.simulation.resources.seedFromWorldMap(this.simulation.world, map);
+  }
+
+  private async loadWorldMapFromStorage(): Promise<GameWorldMap | null> {
+    const manifest = await this.ctx.storage.get<WorldMapManifest>(MAP_MANIFEST_STORAGE_KEY);
+    if (manifest) {
+      const cells: WorldMapCell[] = [];
+      for (const entry of manifest.cells) {
+        const cell = await this.ctx.storage.get<WorldMapCell>(mapCellStorageKey(entry.gridX, entry.gridY));
+        if (cell) cells.push(cell);
+      }
+
+      return {
+        version: 1,
+        name: manifest.name,
+        tileSize: manifest.tileSize,
+        cellSize: manifest.cellSize,
+        cells,
+      };
+    }
+
+    return await this.ctx.storage.get<GameWorldMap>(MAP_STORAGE_KEY) ?? null;
+  }
+
+  private async saveWorldMapAsChunks(map: GameWorldMap): Promise<void> {
+    for (const cell of map.cells) {
+      await this.ctx.storage.put(mapCellStorageKey(cell.gridX, cell.gridY), cell);
+    }
+
+    const manifest: WorldMapManifest = {
+      version: 1,
+      name: map.name,
+      tileSize: map.tileSize,
+      cellSize: map.cellSize,
+      cells: map.cells.map((cell) => ({ gridX: cell.gridX, gridY: cell.gridY })),
+    };
+
+    await this.ctx.storage.put(MAP_MANIFEST_STORAGE_KEY, manifest);
   }
 
   private async loadBuildingsIfNeeded(): Promise<void> {
@@ -385,6 +456,10 @@ export class GameRoom extends DurableObject<Env> {
       // socket already closed
     }
   }
+}
+
+function mapCellStorageKey(gridX: number, gridY: number): string {
+  return `${MAP_CELL_STORAGE_PREFIX}${gridX}:${gridY}`;
 }
 
 function getStablePlayerId(url: URL): string {
