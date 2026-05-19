@@ -43,6 +43,8 @@ export type ResourceSnapshot = {
   cellY: number;
   assetUrl?: string;
   assetScale?: number;
+  displayWidth?: number;
+  displayHeight?: number;
   sourceRect?: WorldMapSourceRect;
   hp: number;
   maxHp: number;
