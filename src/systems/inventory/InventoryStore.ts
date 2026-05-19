@@ -1,10 +1,6 @@
-export type InventoryItemId =
-  | "wood"
-  | "stone"
-  | "fiber"
-  | "floor_kit"
-  | "wall_kit"
-  | "roof_kit";
+import { isInventoryItemId, type InventoryItemId } from './ItemDefinitions';
+
+export type { InventoryItemId };
 
 export type InventoryItemStack = {
   itemId: InventoryItemId;
@@ -40,23 +36,26 @@ export class InventoryStore {
 
   hasAll(costs: InventoryItemStack[]): boolean {
     for (const cost of costs) {
-      if (!Number.isFinite(cost.quantity) || cost.quantity <= 0) {
-        return false;
-      }
-
-      if (this.getQuantity(cost.itemId) < cost.quantity) {
-        return false;
-      }
+      if (!this.isValidStack(cost)) return false;
+      if (this.getQuantity(cost.itemId) < cost.quantity) return false;
     }
 
     return true;
   }
 
   add(itemId: InventoryItemId, quantity: number): InventoryMutationResult {
+    if (!isInventoryItemId(itemId)) {
+      return {
+        ok: false,
+        reason: '알 수 없는 아이템입니다.',
+        snapshot: this.toSnapshot(),
+      };
+    }
+
     if (!Number.isInteger(quantity) || quantity <= 0) {
       return {
         ok: false,
-        reason: "추가 수량이 올바르지 않습니다.",
+        reason: '추가 수량이 올바르지 않습니다.',
         snapshot: this.toSnapshot(),
       };
     }
@@ -74,19 +73,15 @@ export class InventoryStore {
     if (!this.hasAll(costs)) {
       return {
         ok: false,
-        reason: "필요한 재료가 부족합니다.",
+        reason: '필요한 재료가 부족합니다.',
         snapshot: this.toSnapshot(),
       };
     }
 
     for (const cost of costs) {
       const nextQuantity = this.getQuantity(cost.itemId) - cost.quantity;
-
-      if (nextQuantity <= 0) {
-        this.items.delete(cost.itemId);
-      } else {
-        this.items.set(cost.itemId, nextQuantity);
-      }
+      if (nextQuantity <= 0) this.items.delete(cost.itemId);
+      else this.items.set(cost.itemId, nextQuantity);
     }
 
     this.touch();
@@ -106,6 +101,10 @@ export class InventoryStore {
         .map(([itemId, quantity]) => ({ itemId, quantity }))
         .sort((a, b) => a.itemId.localeCompare(b.itemId)),
     };
+  }
+
+  private isValidStack(stack: InventoryItemStack): boolean {
+    return isInventoryItemId(stack.itemId) && Number.isInteger(stack.quantity) && stack.quantity > 0;
   }
 
   private touch(): void {
