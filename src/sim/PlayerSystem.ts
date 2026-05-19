@@ -31,6 +31,10 @@ export function createPlayer(id: string): PlayerEntity {
     facing: 'down',
     lastInputSeq: 0,
     inventory: { wood: STARTER_BUILDING_WOOD, stone: STARTER_BUILDING_STONE },
+    inventoryItems: [
+      { itemId: 'wood', quantity: STARTER_BUILDING_WOOD },
+      { itemId: 'stone', quantity: STARTER_BUILDING_STONE },
+    ],
     input: { up: false, down: false, left: false, right: false },
     nextGatherAt: 0,
   };
