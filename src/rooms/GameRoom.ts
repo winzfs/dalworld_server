@@ -12,6 +12,7 @@ import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState';
 import { BuildingGrid } from '../systems/building/BuildingGrid';
 import { BuildingService } from '../systems/building/BuildingService';
+import type { BuildingSnapshot } from '../systems/building/BuildingTypes';
 import { CraftingService } from '../systems/crafting/CraftingService';
 import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
@@ -22,6 +23,7 @@ import type { GameWorldMap } from '../worldMap/types';
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
 const MAP_STORAGE_KEY = 'world:default-map';
+const BUILDING_STORAGE_KEY = 'world:buildings';
 const BUILDING_GRID_WIDTH = 256;
 const BUILDING_GRID_HEIGHT = 256;
 const BUILDING_GRID_MAX_Z = 8;
@@ -40,6 +42,8 @@ export class GameRoom extends DurableObject<Env> {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
   private worldMap: GameWorldMap | null = null;
+  private buildingsLoaded = false;
+  private buildingSavePromise: Promise<void> | null = null;
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -58,6 +62,8 @@ export class GameRoom extends DurableObject<Env> {
         return Response.json({ ok: true });
       }
     }
+
+    await this.loadBuildingsIfNeeded();
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -102,6 +108,27 @@ export class GameRoom extends DurableObject<Env> {
   private setWorldMap(map: GameWorldMap | null): void {
     this.worldMap = map;
     this.simulation.resources.seedFromWorldMap(this.simulation.world, map);
+  }
+
+  private async loadBuildingsIfNeeded(): Promise<void> {
+    if (this.buildingsLoaded) return;
+    this.buildingsLoaded = true;
+
+    const snapshot = await this.ctx.storage.get<BuildingSnapshot>(BUILDING_STORAGE_KEY);
+    if (!snapshot) return;
+
+    for (const part of snapshot.parts) {
+      this.buildingGrid.place(part);
+    }
+  }
+
+  private persistBuildings(): void {
+    const snapshot = this.buildingGrid.toSnapshot();
+    this.buildingSavePromise = this.ctx.storage.put(BUILDING_STORAGE_KEY, snapshot)
+      .catch((error) => {
+        console.warn('[Building] failed to persist building snapshot', error);
+      })
+      .then(() => undefined);
   }
 
   private handleMessage(socket: WebSocket, raw: string | ArrayBuffer): void {
@@ -202,9 +229,20 @@ export class GameRoom extends DurableObject<Env> {
           ? service.remove(playerId, message)
           : service.toggleDoor(playerId, message);
 
+    let didMutateBuildings = false;
+
     for (const event of result.events) {
       if (event.type === 'INVENTORY_SNAPSHOT') {
         this.applyInventorySnapshot(player, event);
+      }
+
+      if (
+        event.type === 'BUILD_PLACED' ||
+        event.type === 'BUILD_UPDATED' ||
+        event.type === 'BUILD_REMOVED' ||
+        event.type === 'BUILD_DOOR_UPDATED'
+      ) {
+        didMutateBuildings = true;
       }
 
       if (event.type === 'BUILD_REJECTED' || event.type === 'INVENTORY_SNAPSHOT') {
@@ -213,6 +251,8 @@ export class GameRoom extends DurableObject<Env> {
         this.broadcast(event);
       }
     }
+
+    if (didMutateBuildings) this.persistBuildings();
   }
 
   private handleCraftingMessage(
