@@ -165,7 +165,7 @@ export type ServerToClientMessage =
       players: PlayerSnapshot[];
       resources: ResourceSnapshot[];
       monsters: MonsterSnapshot[];
-      timeOfDay: TimeOfDayState;
+      timeOfDay?: TimeOfDayState;
     }
   | { type: 'event'; serverTime: number; event: ServerEvent }
   | { type: 'pong'; now: number }
