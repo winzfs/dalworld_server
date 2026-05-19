@@ -32,6 +32,8 @@ export class GameSimulation {
       cellX: r.cellX,
       cellY: r.cellY,
       assetUrl: r.assetUrl,
+      assetScale: r.assetScale,
+      sourceRect: r.sourceRect,
       hp: r.hp,
       maxHp: r.maxHp,
       respawnAt: r.respawnAt,
