@@ -82,7 +82,6 @@ export class ResourceSystem {
       return { ok: false, reason: 'no_stamina' };
     }
 
-    // Resolve target: use provided ID or fall back to nearest alive resource in range inside the player's current cell.
     let resource: ResourceEntity | undefined;
     if (resourceId) {
       const candidate = world.resources.get(resourceId);
@@ -149,13 +148,13 @@ export class ResourceSystem {
   }
 
   private createFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): ResourceEntity | null {
-    if (placement.gameplay?.kind !== 'resource') return null;
+    const type = getPlacementResourceType(placement);
+    if (!type) return null;
 
-    const type = placement.gameplay.resourceType;
     const template = TEMPLATES[type];
     if (!template) return null;
 
-    const maxHp = normalizePositiveNumber(placement.gameplay.maxHp, template.maxHp);
+    const maxHp = normalizePositiveNumber(placement.gameplay?.maxHp, template.maxHp);
 
     return {
       id: `map-resource:${cellX}:${cellY}:${placement.id}`,
@@ -185,6 +184,24 @@ export class ResourceSystem {
       respawnAt: 0,
     };
   }
+}
+
+function getPlacementResourceType(placement: WorldMapPlacement): ResourceType | null {
+  if (placement.gameplay?.kind === 'resource') {
+    return placement.gameplay.resourceType;
+  }
+
+  if (placement.layer === 'collision') return null;
+
+  const filename = getFilename(placement.assetUrl).toLowerCase();
+  if (filename.startsWith('rock')) return 'stone';
+  if (filename.startsWith('tree')) return 'tree';
+  return null;
+}
+
+function getFilename(url: string): string {
+  const cleanUrl = url.split('?')[0]?.split('#')[0] ?? url;
+  return cleanUrl.split('/').pop() ?? '';
 }
 
 function randomPosition(): { x: number; y: number } {
