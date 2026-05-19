@@ -1,9 +1,14 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { MonsterSnapshot, ResourceSnapshot, ServerToClientMessage } from '../protocol/messages';
+import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { MonsterSystem } from './MonsterSystem';
 import { PlayerSystem } from './PlayerSystem';
 import { ResourceSystem } from './ResourceSystem';
 import { TICK_RATE, WorldState } from './WorldState';
+
+export type GameSimulationStepOptions = {
+  buildingGrid?: BuildingGrid;
+};
 
 export class GameSimulation {
   readonly world = new WorldState();
@@ -16,11 +21,11 @@ export class GameSimulation {
     this.monsters.seed(this.world, GAME_CONFIG.monster.startingMonsters);
   }
 
-  step(dt: number, nowMs: number): void {
+  step(dt: number, nowMs: number, options: GameSimulationStepOptions = {}): void {
     this.world.tick += 1;
-    this.players.update(this.world, dt);
+    this.players.update(this.world, dt, { buildingGrid: options.buildingGrid });
     this.resources.update(this.world, nowMs);
-    this.monsters.update(this.world, dt);
+    this.monsters.update(this.world, dt, { buildingGrid: options.buildingGrid });
   }
 
   buildSnapshot(nowMs: number): ServerToClientMessage {
