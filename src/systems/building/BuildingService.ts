@@ -109,7 +109,7 @@ export class BuildingService {
     const target = this.grid.getById(parsed.request.entityId);
     if (!target) return this.reject(parsed.request.requestId, "철거할 건설물을 찾을 수 없습니다.");
     if (target.ownerId !== ownerId) return this.reject(parsed.request.requestId, "다른 플레이어의 건설물은 철거할 수 없습니다.");
-    if (this.grid.hasAnyPartAbove(target.x, target.y, target.z)) return this.reject(parsed.request.requestId, "위에 다른 건설물이 있어 먼저 제거해야 합니다.");
+    if (this.grid.hasBlockingPartAbove(target)) return this.reject(parsed.request.requestId, "바로 위에 연결된 건설물이 있어 먼저 제거해야 합니다.");
 
     const definition = getBuildPartDefinition(target.partId);
     if (!definition) return this.reject(parsed.request.requestId, "건설물 정의를 찾을 수 없습니다.");
