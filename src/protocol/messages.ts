@@ -1,4 +1,6 @@
 import type { BuildingServerEvent, BuildDoorToggleRequest, BuildPlaceRequest, BuildRemoveRequest, BuildUpdateRequest } from '../systems/building/BuildingTypes';
+import type { CraftingRecipeId } from '../systems/crafting/CraftingTypes';
+import type { InventorySnapshot } from '../systems/inventory/InventoryStore';
 import type { GameWorldMap, WorldMapSourceRect } from '../worldMap/types';
 
 export type MovementKeys = {
@@ -83,6 +85,27 @@ export type PublicGameConfig = {
 
 export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildDoorToggleRequest;
 
+export type CraftingClientMessage = {
+  type: 'CRAFT_REQUEST';
+  requestId: string;
+  recipeId: CraftingRecipeId;
+};
+
+export type CraftingCompletedEvent = {
+  type: 'CRAFT_COMPLETED';
+  requestId: string;
+  recipeId: CraftingRecipeId;
+  inventory: InventorySnapshot;
+};
+
+export type CraftingRejectedEvent = {
+  type: 'CRAFT_REJECTED';
+  requestId: string;
+  reason: string;
+};
+
+export type CraftingServerEvent = CraftingCompletedEvent | CraftingRejectedEvent;
+
 export type ClientToServerMessage =
   | { type: 'hello'; name?: string }
   | {
@@ -101,7 +124,8 @@ export type ClientToServerMessage =
       resourceId?: string;
     }
   | { type: 'ping'; now: number }
-  | BuildingClientMessage;
+  | BuildingClientMessage
+  | CraftingClientMessage;
 
 export type ServerEvent =
   | { type: 'player_joined'; playerId: string }
@@ -130,4 +154,5 @@ export type ServerToClientMessage =
     }
   | { type: 'event'; serverTime: number; event: ServerEvent }
   | { type: 'pong'; now: number }
-  | BuildingServerEvent;
+  | BuildingServerEvent
+  | CraftingServerEvent;
