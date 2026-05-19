@@ -1,4 +1,4 @@
-import type { BuildingServerEvent, BuildDoorToggleRequest, BuildPlaceRequest, BuildRemoveRequest } from '../systems/building/BuildingTypes';
+import type { BuildingServerEvent, BuildDoorToggleRequest, BuildPlaceRequest, BuildRemoveRequest, BuildUpdateRequest } from '../systems/building/BuildingTypes';
 import type { GameWorldMap, WorldMapSourceRect } from '../worldMap/types';
 
 export type MovementKeys = {
@@ -81,7 +81,7 @@ export type PublicGameConfig = {
   gameplay: PublicGameplayConfig;
 };
 
-export type BuildingClientMessage = BuildPlaceRequest | BuildRemoveRequest | BuildDoorToggleRequest;
+export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildDoorToggleRequest;
 
 export type ClientToServerMessage =
   | { type: 'hello'; name?: string }
