@@ -1,6 +1,7 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import { getMonsterCollisionConfig } from '../config/monsterCollisionConfig';
 import type { MonsterType } from '../protocol/messages';
+import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
 import {
@@ -26,6 +27,10 @@ type CollisionCircle = {
   radius: number;
 };
 
+export type MonsterSystemUpdateOptions = {
+  buildingGrid?: BuildingGrid;
+};
+
 const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
 const SPAWN_TYPES: MonsterType[] = ['wild_slime', 'sheep'];
 const START_AREA_SHEEP_COUNT = 3;
@@ -47,13 +52,13 @@ export class MonsterSystem {
     }
   }
 
-  update(world: WorldState, dt: number): void {
+  update(world: WorldState, dt: number, options: MonsterSystemUpdateOptions = {}): void {
     for (const monster of world.monsters.values()) {
-      this.updateAi(monster, world, dt);
+      this.updateAi(monster, world, dt, options.buildingGrid);
     }
   }
 
-  private updateAi(monster: MonsterEntity, world: WorldState, dt: number): void {
+  private updateAi(monster: MonsterEntity, world: WorldState, dt: number, buildingGrid?: BuildingGrid): void {
     const target = this.findOrKeepTarget(monster, world);
 
     if (!target) {
@@ -76,7 +81,7 @@ export class MonsterSystem {
       WORLD_WIDTH - collision.radius,
     );
 
-    if (this.canOccupy(monster, nextX, monster.y, world)) {
+    if (this.canOccupy(monster, nextX, monster.y, world, buildingGrid)) {
       monster.x = nextX;
     }
 
@@ -86,13 +91,17 @@ export class MonsterSystem {
       WORLD_HEIGHT - collision.radius,
     );
 
-    if (this.canOccupy(monster, monster.x, nextY, world)) {
+    if (this.canOccupy(monster, monster.x, nextY, world, buildingGrid)) {
       monster.y = nextY;
     }
   }
 
-  private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState): boolean {
+  private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
     const selfCircle = getCollisionCircle(monster.type, x, y);
+
+    if (buildingGrid && !buildingGrid.canOccupyWorldCircle(selfCircle.x, selfCircle.y, selfCircle.radius)) {
+      return false;
+    }
 
     for (const player of world.players.values()) {
       if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, player.x, player.y, PLAYER_RADIUS)) {
