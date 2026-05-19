@@ -177,12 +177,17 @@ export class BuildingService {
     | { ok: true; record: Record<string, unknown>; requestId: string; x: number; y: number; z: number; rotation: 0 | 1 | 2 | 3 }
     | { ok: false; requestId: string; reason: string } {
     if (!this.isRecord(request)) return { ok: false, requestId: "unknown", reason: "건설 요청 형식이 올바르지 않습니다." };
+
     const requestId = typeof request.requestId === "string" ? request.requestId : "unknown";
     if (request.type !== type) return { ok: false, requestId, reason: "건설 요청 타입이 올바르지 않습니다." };
     if (typeof request.requestId !== "string" || request.requestId.length === 0) return { ok: false, requestId, reason: "requestId가 필요합니다." };
-    if (!Number.isInteger(request.x) || !Number.isInteger(request.y) || !Number.isInteger(request.z)) return { ok: false, requestId, reason: "건설 좌표는 정수여야 합니다." };
-    if (![0, 1, 2, 3].includes(Number(request.rotation))) return { ok: false, requestId, reason: "회전값이 올바르지 않습니다." };
-    return { ok: true, record: request, requestId: request.requestId, x: request.x, y: request.y, z: request.z, rotation: request.rotation as 0 | 1 | 2 | 3 };
+
+    const { x, y, z, rotation } = request;
+    if (typeof x !== "number" || typeof y !== "number" || typeof z !== "number") return { ok: false, requestId, reason: "건설 좌표는 숫자여야 합니다." };
+    if (!Number.isInteger(x) || !Number.isInteger(y) || !Number.isInteger(z)) return { ok: false, requestId, reason: "건설 좌표는 정수여야 합니다." };
+    if (rotation !== 0 && rotation !== 1 && rotation !== 2 && rotation !== 3) return { ok: false, requestId, reason: "회전값이 올바르지 않습니다." };
+
+    return { ok: true, record: request, requestId: request.requestId, x, y, z, rotation };
   }
 
   private parseRemoveRequest(request: unknown):
