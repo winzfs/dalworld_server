@@ -33,6 +33,12 @@ const ISO_TILE_HEIGHT = 32;
 const ISO_LAYER_HEIGHT = 32;
 const STACKABLE_EDGE_CATEGORIES: BuildCategory[] = ["wall", "door", "window"];
 const UPPER_TILE_SUPPORT_CATEGORIES: BuildCategory[] = ["floor", "wall", "door", "window", "support"];
+const FLOOR_ADJACENCY_OFFSETS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+];
 
 export class BuildingGrid {
   private readonly width: number;
@@ -246,10 +252,16 @@ export class BuildingGrid {
 
   private validateUpperTileSupport(x: number, y: number, z: number): BuildingValidationResult {
     if (z <= 0) return { ok: true };
-    const belowCell = this.cells.get(this.toCellKey(x, y, z - 1));
-    if (!belowCell) return { ok: false, reason: "위층 바닥을 받칠 벽/기둥이 없습니다." };
+    if (this.hasDirectUpperTileSupport(x, y, z)) return { ok: true };
+    if (this.hasAdjacentFloorSupport(x, y, z)) return { ok: true };
+    return { ok: false, reason: "위층 바닥은 아래 지지물 또는 같은 층 인접 바닥에 이어서 배치해야 합니다." };
+  }
 
-    const supported = [belowCell.tile, ...Object.values(belowCell.edges), ...Object.values(belowCell.corners)]
+  private hasDirectUpperTileSupport(x: number, y: number, z: number): boolean {
+    const belowCell = this.cells.get(this.toCellKey(x, y, z - 1));
+    if (!belowCell) return false;
+
+    return [belowCell.tile, ...Object.values(belowCell.edges), ...Object.values(belowCell.corners)]
       .filter((entityId): entityId is string => typeof entityId === "string")
       .map((entityId) => this.partsById.get(entityId))
       .filter((part): part is PlacedBuildPart => Boolean(part))
@@ -257,8 +269,16 @@ export class BuildingGrid {
         const supportDefinition = getBuildPartDefinition(part.partId);
         return Boolean(supportDefinition && UPPER_TILE_SUPPORT_CATEGORIES.includes(supportDefinition.category));
       });
+  }
 
-    return supported ? { ok: true } : { ok: false, reason: "위층 바닥을 받칠 벽/기둥이 없습니다." };
+  private hasAdjacentFloorSupport(x: number, y: number, z: number): boolean {
+    return FLOOR_ADJACENCY_OFFSETS.some((offset) => {
+      const entityId = this.cells.get(this.toCellKey(x + offset.x, y + offset.y, z))?.tile;
+      if (!entityId) return false;
+      const part = this.partsById.get(entityId);
+      const definition = part ? getBuildPartDefinition(part.partId) : null;
+      return Boolean(definition && definition.category === "floor");
+    });
   }
 
   private getEdgePartFromCell(cell: CellBuildSlots, rotation: BuildRotation): PlacedBuildPart | null {
