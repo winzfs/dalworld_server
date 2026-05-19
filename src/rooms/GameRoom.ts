@@ -9,10 +9,12 @@ import type {
 import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
-import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
+import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState';
 import { BuildingGrid } from '../systems/building/BuildingGrid';
 import { BuildingService } from '../systems/building/BuildingService';
-import { InventoryStore } from '../systems/inventory/InventoryStore';
+import { CraftingService } from '../systems/crafting/CraftingService';
+import { InventoryService } from '../systems/inventory/InventoryService';
+import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap } from '../worldMap/types';
@@ -130,6 +132,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'BUILD_DOOR_TOGGLE_REQUEST':
         this.handleBuildingMessage(socket, playerId, message);
         return;
+      case 'CRAFT_REQUEST':
+        this.handleCraftingMessage(socket, playerId, message.requestId, message.recipeId);
+        return;
       case 'input': {
         applyInput(player, message.seq, message.keys, message.facing);
 
@@ -181,12 +186,10 @@ export class GameRoom extends DurableObject<Env> {
     const player = this.simulation.world.players.get(playerId);
     if (!player) return;
 
+    const store = this.createInventoryStore(playerId, player);
     const service = new BuildingService({
       grid: this.buildingGrid,
-      getInventory: () => new InventoryStore(playerId, [
-        { itemId: 'wood', quantity: player.inventory.wood },
-        { itemId: 'stone', quantity: player.inventory.stone },
-      ]),
+      getInventory: () => store,
       createEntityId: () => crypto.randomUUID(),
       now: () => Date.now(),
     });
@@ -201,8 +204,7 @@ export class GameRoom extends DurableObject<Env> {
 
     for (const event of result.events) {
       if (event.type === 'INVENTORY_SNAPSHOT') {
-        player.inventory.wood = event.items.find((item) => item.itemId === 'wood')?.quantity ?? 0;
-        player.inventory.stone = event.items.find((item) => item.itemId === 'stone')?.quantity ?? 0;
+        this.applyInventorySnapshot(player, event);
       }
 
       if (event.type === 'BUILD_REJECTED' || event.type === 'INVENTORY_SNAPSHOT') {
@@ -211,6 +213,47 @@ export class GameRoom extends DurableObject<Env> {
         this.broadcast(event);
       }
     }
+  }
+
+  private handleCraftingMessage(
+    socket: WebSocket,
+    playerId: string,
+    requestId: string,
+    recipeId: string,
+  ): void {
+    const player = this.simulation.world.players.get(playerId);
+    if (!player) return;
+
+    const store = this.createInventoryStore(playerId, player);
+    const inventory = new InventoryService({ getStore: () => store });
+    const crafting = new CraftingService({ inventory });
+    const result = crafting.craft(playerId, recipeId);
+
+    if (!result.ok) {
+      this.send(socket, { type: 'CRAFT_REJECTED', requestId, reason: result.reason });
+      return;
+    }
+
+    const snapshot = store.toSnapshot();
+    this.applyInventorySnapshot(player, snapshot);
+    this.send(socket, {
+      type: 'CRAFT_COMPLETED',
+      requestId,
+      recipeId: result.recipe.id,
+      inventory: snapshot,
+    });
+  }
+
+  private createInventoryStore(playerId: string, player: PlayerEntity): InventoryStore {
+    return new InventoryStore(playerId, [
+      { itemId: 'wood', quantity: player.inventory.wood },
+      { itemId: 'stone', quantity: player.inventory.stone },
+    ]);
+  }
+
+  private applyInventorySnapshot(player: PlayerEntity, snapshot: InventorySnapshot): void {
+    player.inventory.wood = snapshot.items.find((item) => item.itemId === 'wood')?.quantity ?? 0;
+    player.inventory.stone = snapshot.items.find((item) => item.itemId === 'stone')?.quantity ?? 0;
   }
 
   private checkRateLimit(socket: WebSocket): boolean {
