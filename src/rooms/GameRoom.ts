@@ -5,6 +5,7 @@ import type {
   ClientToServerMessage,
   ServerEvent,
   ServerToClientMessage,
+  TimeOfDayState,
 } from '../protocol/messages';
 import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
@@ -73,6 +74,7 @@ export class GameRoom extends DurableObject<Env> {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
   private worldMap: GameWorldMap | null = null;
+  private timeOfDay: TimeOfDayState = { mode: 'day' };
   private buildingsLoaded = false;
   private buildingSavePromise: Promise<void> | null = null;
 
@@ -138,6 +140,7 @@ export class GameRoom extends DurableObject<Env> {
       world: publicConfig.world,
       gameplay: publicConfig.gameplay,
       map: this.worldMap,
+      timeOfDay: this.timeOfDay,
       serverTime: now,
     });
 
@@ -241,6 +244,10 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'hello':
         return;
+      case 'TIME_OF_DAY_TOGGLE_REQUEST':
+        this.toggleTimeOfDay();
+        this.broadcastSnapshot(Date.now());
+        return;
       case 'BUILD_PLACE_REQUEST':
       case 'BUILD_UPDATE_REQUEST':
       case 'BUILD_REMOVE_REQUEST':
@@ -291,6 +298,12 @@ export class GameRoom extends DurableObject<Env> {
         return;
       }
     }
+  }
+
+  private toggleTimeOfDay(): void {
+    this.timeOfDay = {
+      mode: this.timeOfDay.mode === 'day' ? 'night' : 'day',
+    };
   }
 
   private handleBuildingMessage(
@@ -414,7 +427,10 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   private broadcastSnapshot(nowMs: number): void {
-    const snapshot = this.simulation.buildSnapshot(nowMs);
+    const snapshot = {
+      ...this.simulation.buildSnapshot(nowMs),
+      timeOfDay: this.timeOfDay,
+    } satisfies ServerToClientMessage;
     const payload = JSON.stringify(snapshot);
     for (const socket of this.sessions.keys()) {
       try {
