@@ -18,7 +18,7 @@ import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
-import type { GameWorldMap, WorldMapCell } from '../worldMap/types';
+import type { GameWorldMap, WorldMapCell, WorldMapPlacement } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
@@ -38,6 +38,25 @@ type WorldMapManifest = {
   tileSize: number;
   cellSize: number;
   cells: Array<{ gridX: number; gridY: number }>;
+};
+
+type CompactWorldMapAsset = Omit<WorldMapPlacement, 'id' | 'x' | 'y' | 'layer' | 'scale'>;
+
+type CompactWorldMapPlacement = {
+  a: number;
+  id: string;
+  x: number;
+  y: number;
+  l: WorldMapPlacement['layer'];
+  s?: number;
+};
+
+type CompactWorldMapCell = {
+  format: 'compact-v1';
+  gridX: number;
+  gridY: number;
+  assets: CompactWorldMapAsset[];
+  placements: CompactWorldMapPlacement[];
 };
 
 export class GameRoom extends DurableObject<Env> {
@@ -80,12 +99,9 @@ export class GameRoom extends DurableObject<Env> {
         return Response.json({ ok: false, reason: 'gridX/gridY must be integers' }, { status: 400 });
       }
 
-      const cell = await request.json<WorldMapCell>();
-      await this.ctx.storage.put(mapCellStorageKey(gridX, gridY), {
-        ...cell,
-        gridX,
-        gridY,
-      });
+      const rawCell = await request.json<WorldMapCell | CompactWorldMapCell>();
+      const cell = expandWorldMapCell(rawCell, gridX, gridY);
+      await this.ctx.storage.put(mapCellStorageKey(gridX, gridY), cell);
       return Response.json({ ok: true });
     }
 
@@ -456,6 +472,41 @@ export class GameRoom extends DurableObject<Env> {
       // socket already closed
     }
   }
+}
+
+function expandWorldMapCell(rawCell: WorldMapCell | CompactWorldMapCell, gridX: number, gridY: number): WorldMapCell {
+  if (!isCompactWorldMapCell(rawCell)) {
+    return {
+      ...rawCell,
+      gridX,
+      gridY,
+    };
+  }
+
+  const placements = rawCell.placements
+    .map((placement) => {
+      const asset = rawCell.assets[placement.a];
+      if (!asset) return null;
+      return {
+        ...asset,
+        id: placement.id,
+        x: placement.x,
+        y: placement.y,
+        layer: placement.l,
+        scale: placement.s ?? 1,
+      } satisfies WorldMapPlacement;
+    })
+    .filter((placement): placement is WorldMapPlacement => placement !== null);
+
+  return {
+    gridX,
+    gridY,
+    placements,
+  };
+}
+
+function isCompactWorldMapCell(value: WorldMapCell | CompactWorldMapCell): value is CompactWorldMapCell {
+  return typeof value === 'object' && value !== null && 'format' in value && value.format === 'compact-v1';
 }
 
 function mapCellStorageKey(gridX: number, gridY: number): string {
