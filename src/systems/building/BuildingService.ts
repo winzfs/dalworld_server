@@ -2,6 +2,7 @@ import { InventoryStore } from "../inventory/InventoryStore";
 import { getBuildPartDefinition, isBuildPartId } from "./BuildingParts";
 import { BuildingGrid } from "./BuildingGrid";
 import type {
+  BuildDoorToggleRequest,
   BuildPlaceRequest,
   BuildRemoveRequest,
   BuildingServerEvent,
@@ -67,6 +68,7 @@ export class BuildingService {
       parsed.request.x,
       parsed.request.y,
       parsed.request.z,
+      parsed.request.rotation,
     );
 
     if (!placementValidation.ok) {
@@ -102,10 +104,11 @@ export class BuildingService {
       y: parsed.request.y,
       z: parsed.request.z,
       rotation: parsed.request.rotation,
+      state: parsed.request.partId === "door" ? { open: false } : undefined,
       createdAt: this.now(),
     };
 
-    this.grid.place(part);
+    this.grid.place(part, definition);
 
     return {
       events: [
@@ -170,6 +173,46 @@ export class BuildingService {
           ownerId: inventorySnapshot.ownerId,
           items: inventorySnapshot.items,
           updatedAt: inventorySnapshot.updatedAt,
+        },
+      ],
+    };
+  }
+
+  toggleDoor(ownerId: string, request: unknown): BuildingCommandResult {
+    const parsed = this.parseDoorToggleRequest(request);
+
+    if (!parsed.ok) {
+      return this.reject(parsed.requestId, parsed.reason);
+    }
+
+    const target = this.grid.getById(parsed.request.entityId);
+
+    if (!target) {
+      return this.reject(parsed.request.requestId, "문을 찾을 수 없습니다.");
+    }
+
+    if (target.partId !== "door") {
+      return this.reject(parsed.request.requestId, "문만 열고 닫을 수 있습니다.");
+    }
+
+    if (target.ownerId !== ownerId) {
+      return this.reject(parsed.request.requestId, "다른 플레이어의 문은 조작할 수 없습니다.");
+    }
+
+    const open = !Boolean(target.state?.open);
+    const updated: PlacedBuildPart = {
+      ...target,
+      state: { ...target.state, open },
+    };
+
+    this.grid.updatePart(updated);
+
+    return {
+      events: [
+        {
+          type: "BUILD_DOOR_UPDATED",
+          entityId: updated.entityId,
+          open,
         },
       ],
     };
@@ -243,6 +286,37 @@ export class BuildingService {
       ok: true,
       request: {
         type: "BUILD_REMOVE_REQUEST",
+        requestId: request.requestId,
+        entityId: request.entityId,
+      },
+    };
+  }
+
+  private parseDoorToggleRequest(request: unknown):
+    | { ok: true; request: BuildDoorToggleRequest }
+    | { ok: false; requestId: string; reason: string } {
+    if (!this.isRecord(request)) {
+      return { ok: false, requestId: "unknown", reason: "문 조작 요청 형식이 올바르지 않습니다." };
+    }
+
+    const requestId = typeof request.requestId === "string" ? request.requestId : "unknown";
+
+    if (request.type !== "BUILD_DOOR_TOGGLE_REQUEST") {
+      return { ok: false, requestId, reason: "문 조작 요청 타입이 올바르지 않습니다." };
+    }
+
+    if (typeof request.requestId !== "string" || request.requestId.length === 0) {
+      return { ok: false, requestId, reason: "requestId가 필요합니다." };
+    }
+
+    if (typeof request.entityId !== "string" || request.entityId.length === 0) {
+      return { ok: false, requestId, reason: "조작할 문 entityId가 필요합니다." };
+    }
+
+    return {
+      ok: true,
+      request: {
+        type: "BUILD_DOOR_TOGGLE_REQUEST",
         requestId: request.requestId,
         entityId: request.entityId,
       },
