@@ -59,6 +59,8 @@ type CompactWorldMapCell = {
   placements: CompactWorldMapPlacement[];
 };
 
+type StoredWorldMapCell = WorldMapCell | CompactWorldMapCell;
+
 export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
   private readonly sessions = new Map<WebSocket, string>();
@@ -99,9 +101,8 @@ export class GameRoom extends DurableObject<Env> {
         return Response.json({ ok: false, reason: 'gridX/gridY must be integers' }, { status: 400 });
       }
 
-      const rawCell = await request.json<WorldMapCell | CompactWorldMapCell>();
-      const cell = expandWorldMapCell(rawCell, gridX, gridY);
-      await this.ctx.storage.put(mapCellStorageKey(gridX, gridY), cell);
+      const rawCell = await request.json<StoredWorldMapCell>();
+      await this.ctx.storage.put(mapCellStorageKey(gridX, gridY), withCellCoordinates(rawCell, gridX, gridY));
       return Response.json({ ok: true });
     }
 
@@ -165,8 +166,8 @@ export class GameRoom extends DurableObject<Env> {
     if (manifest) {
       const cells: WorldMapCell[] = [];
       for (const entry of manifest.cells) {
-        const cell = await this.ctx.storage.get<WorldMapCell>(mapCellStorageKey(entry.gridX, entry.gridY));
-        if (cell) cells.push(cell);
+        const storedCell = await this.ctx.storage.get<StoredWorldMapCell>(mapCellStorageKey(entry.gridX, entry.gridY));
+        if (storedCell) cells.push(expandWorldMapCell(storedCell, entry.gridX, entry.gridY));
       }
 
       return {
@@ -474,7 +475,23 @@ export class GameRoom extends DurableObject<Env> {
   }
 }
 
-function expandWorldMapCell(rawCell: WorldMapCell | CompactWorldMapCell, gridX: number, gridY: number): WorldMapCell {
+function withCellCoordinates(rawCell: StoredWorldMapCell, gridX: number, gridY: number): StoredWorldMapCell {
+  if (isCompactWorldMapCell(rawCell)) {
+    return {
+      ...rawCell,
+      gridX,
+      gridY,
+    };
+  }
+
+  return {
+    ...rawCell,
+    gridX,
+    gridY,
+  };
+}
+
+function expandWorldMapCell(rawCell: StoredWorldMapCell, gridX: number, gridY: number): WorldMapCell {
   if (!isCompactWorldMapCell(rawCell)) {
     return {
       ...rawCell,
@@ -505,7 +522,7 @@ function expandWorldMapCell(rawCell: WorldMapCell | CompactWorldMapCell, gridX: 
   };
 }
 
-function isCompactWorldMapCell(value: WorldMapCell | CompactWorldMapCell): value is CompactWorldMapCell {
+function isCompactWorldMapCell(value: StoredWorldMapCell): value is CompactWorldMapCell {
   return typeof value === 'object' && value !== null && 'format' in value && value.format === 'compact-v1';
 }
 
