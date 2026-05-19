@@ -1,4 +1,5 @@
-import { InventoryStore } from "../inventory/InventoryStore";
+import { InventoryStore, type InventoryItemStack } from "../inventory/InventoryStore";
+import { createBuildPartItemId } from "../inventory/ItemDefinitions";
 import { getBuildPartDefinition, isBuildPartId } from "./BuildingParts";
 import { BuildingGrid } from "./BuildingGrid";
 import type {
@@ -51,7 +52,8 @@ export class BuildingService {
     if (!placementValidation.ok) return this.reject(parsed.request.requestId, placementValidation.reason);
 
     const inventory = this.getInventory(ownerId);
-    const consumeResult = inventory.consume(definition.placementCost);
+    const costs = this.getPlacementCosts(inventory, parsed.request.partId, definition.placementCost);
+    const consumeResult = inventory.consume(costs);
     if (!consumeResult.ok) {
       return {
         events: [
@@ -142,6 +144,15 @@ export class BuildingService {
     this.grid.updatePart(updated);
 
     return { events: [{ type: "BUILD_DOOR_UPDATED", entityId: updated.entityId, open }] };
+  }
+
+  private getPlacementCosts(inventory: InventoryStore, partId: BuildPlaceRequest["partId"], rawCosts: InventoryItemStack[]): InventoryItemStack[] {
+    const buildPartItemId = createBuildPartItemId(partId);
+    if (inventory.getQuantity(buildPartItemId) > 0) {
+      return [{ itemId: buildPartItemId, quantity: 1 }];
+    }
+
+    return rawCosts;
   }
 
   private parsePlaceRequest(request: unknown):
