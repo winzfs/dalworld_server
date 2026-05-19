@@ -155,6 +155,11 @@ export class ResourceSystem {
     if (!template) return null;
 
     const maxHp = normalizePositiveNumber(placement.gameplay?.maxHp, template.maxHp);
+    const scale = normalizePositiveNumber(placement.scale, 1);
+    const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
+    const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
+    const scaledWidth = displayWidth * scale;
+    const scaledHeight = displayHeight * scale;
 
     return {
       id: `map-resource:${cellX}:${cellY}:${placement.id}`,
@@ -162,10 +167,12 @@ export class ResourceSystem {
       cellX,
       cellY,
       assetUrl: placement.assetUrl,
-      assetScale: placement.scale,
+      assetScale: scale,
+      displayWidth,
+      displayHeight,
       sourceRect: placement.sourceRect ? { ...placement.sourceRect } : undefined,
-      x: placement.x,
-      y: placement.y,
+      x: placement.x + scaledWidth / 2,
+      y: placement.y + scaledHeight / 2,
       hp: maxHp,
       maxHp,
       respawnAt: 0,
