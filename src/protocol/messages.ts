@@ -1,4 +1,4 @@
-import type { GameWorldMap } from '../worldMap/types';
+import type { GameWorldMap, WorldMapSourceRect } from '../worldMap/types';
 
 export type MovementKeys = {
   up: boolean;
@@ -42,6 +42,8 @@ export type ResourceSnapshot = {
   cellX: number;
   cellY: number;
   assetUrl?: string;
+  assetScale?: number;
+  sourceRect?: WorldMapSourceRect;
   hp: number;
   maxHp: number;
   respawnAt: number;
