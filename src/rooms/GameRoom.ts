@@ -119,6 +119,7 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'BUILD_PLACE_REQUEST':
       case 'BUILD_REMOVE_REQUEST':
+      case 'BUILD_DOOR_TOGGLE_REQUEST':
         this.handleBuildingMessage(socket, playerId, message);
         return;
       case 'input': {
@@ -181,7 +182,9 @@ export class GameRoom extends DurableObject<Env> {
 
     const result = message.type === 'BUILD_PLACE_REQUEST'
       ? service.place(playerId, message)
-      : service.remove(playerId, message);
+      : message.type === 'BUILD_REMOVE_REQUEST'
+        ? service.remove(playerId, message)
+        : service.toggleDoor(playerId, message);
 
     for (const event of result.events) {
       if (event.type === 'INVENTORY_SNAPSHOT') {
