@@ -151,6 +151,24 @@ export class BuildingGrid {
     this.touch();
   }
 
+  hasBlockingPartAbove(part: PlacedBuildPart): boolean {
+    const definition = getBuildPartDefinition(part.partId);
+    if (!definition) return false;
+
+    const aboveCell = this.cells.get(this.toCellKey(part.x, part.y, part.z + 1));
+    if (!aboveCell) return false;
+
+    if (definition.slotKind === "edge") {
+      return Boolean(aboveCell.edges[rotationToEdge(part.rotation)]);
+    }
+
+    if (definition.slotKind === "corner") {
+      return Boolean(aboveCell.corners[rotationToCorner(part.rotation)]);
+    }
+
+    return Boolean(aboveCell.tile);
+  }
+
   hasAnyPartAbove(x: number, y: number, z: number): boolean {
     for (let nextZ = z + 1; nextZ <= this.maxZ; nextZ += 1) {
       const cell = this.cells.get(this.toCellKey(x, y, nextZ));
