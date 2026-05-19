@@ -63,7 +63,7 @@ export class GameRoom extends DurableObject<Env> {
     const [client, server] = Object.values(pair);
     server.accept();
 
-    const playerId = crypto.randomUUID();
+    const playerId = getStablePlayerId(url);
     this.sessions.set(server, playerId);
     this.simulation.world.players.set(playerId, createPlayer(playerId));
 
@@ -345,6 +345,12 @@ export class GameRoom extends DurableObject<Env> {
       // socket already closed
     }
   }
+}
+
+function getStablePlayerId(url: URL): string {
+  const clientId = url.searchParams.get('clientId');
+  if (clientId && /^client_[0-9a-fA-F-]{36}$/.test(clientId)) return clientId;
+  return `session_${crypto.randomUUID()}`;
 }
 
 export type { ServerEvent };
