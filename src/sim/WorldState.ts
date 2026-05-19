@@ -37,12 +37,16 @@ export type PlayerEntity = {
 export type ResourceEntity = {
   id: string;
   type: ResourceType;
+  /** Center x used for gather targeting and UI anchoring. */
   x: number;
+  /** Center y used for gather targeting and UI anchoring. */
   y: number;
   cellX: number;
   cellY: number;
   assetUrl?: string;
   assetScale?: number;
+  displayWidth?: number;
+  displayHeight?: number;
   sourceRect?: WorldMapSourceRect;
   hp: number;
   maxHp: number;
