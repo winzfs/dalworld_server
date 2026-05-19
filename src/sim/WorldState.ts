@@ -9,6 +9,7 @@ import type {
   MonsterStateName,
   ServerEvent,
 } from '../protocol/messages';
+import type { WorldMapSourceRect } from '../worldMap/types';
 
 export const WORLD_WIDTH = GAME_CONFIG.world.width;
 export const WORLD_HEIGHT = GAME_CONFIG.world.height;
@@ -41,6 +42,8 @@ export type ResourceEntity = {
   cellX: number;
   cellY: number;
   assetUrl?: string;
+  assetScale?: number;
+  sourceRect?: WorldMapSourceRect;
   hp: number;
   maxHp: number;
   /** 0 = alive, otherwise epoch ms when it respawns */
