@@ -162,6 +162,8 @@ export class ResourceSystem {
       cellX,
       cellY,
       assetUrl: placement.assetUrl,
+      assetScale: placement.scale,
+      sourceRect: placement.sourceRect ? { ...placement.sourceRect } : undefined,
       x: placement.x,
       y: placement.y,
       hp: maxHp,
