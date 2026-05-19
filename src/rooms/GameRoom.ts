@@ -245,13 +245,11 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   private createInventoryStore(playerId: string, player: PlayerEntity): InventoryStore {
-    return new InventoryStore(playerId, [
-      { itemId: 'wood', quantity: player.inventory.wood },
-      { itemId: 'stone', quantity: player.inventory.stone },
-    ]);
+    return new InventoryStore(playerId, player.inventoryItems);
   }
 
   private applyInventorySnapshot(player: PlayerEntity, snapshot: InventorySnapshot): void {
+    player.inventoryItems = snapshot.items;
     player.inventory.wood = snapshot.items.find((item) => item.itemId === 'wood')?.quantity ?? 0;
     player.inventory.stone = snapshot.items.find((item) => item.itemId === 'stone')?.quantity ?? 0;
   }
