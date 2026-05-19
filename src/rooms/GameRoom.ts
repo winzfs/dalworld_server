@@ -137,7 +137,10 @@ export class GameRoom extends DurableObject<Env> {
           const nextX = clamp(message.clientX ?? player.x, 0, cellSize);
           const nextY = clamp(message.clientY ?? player.y, 0, cellSize);
 
-          if (canCircleOccupyCell(this.worldMap, player.cellX, player.cellY, nextX, nextY, PLAYER_RADIUS)) {
+          if (
+            canCircleOccupyCell(this.worldMap, player.cellX, player.cellY, nextX, nextY, PLAYER_RADIUS) &&
+            this.buildingGrid.canOccupyWorldCircle(nextX, nextY, PLAYER_RADIUS)
+          ) {
             player.x = nextX;
             player.y = nextY;
           }
@@ -220,7 +223,7 @@ export class GameRoom extends DurableObject<Env> {
       const dt = Math.min(0.25, (now - this.lastStepAt) / 1000);
       this.lastStepAt = now;
 
-      this.simulation.step(dt, now);
+      this.simulation.step(dt, now, { buildingGrid: this.buildingGrid });
       this.broadcastSnapshot(now);
       this.flushEvents(now);
 
