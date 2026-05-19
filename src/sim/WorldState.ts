@@ -9,6 +9,7 @@ import type {
   MonsterStateName,
   ServerEvent,
 } from '../protocol/messages';
+import type { InventoryItemStack } from '../systems/inventory/InventoryStore';
 import type { WorldMapSourceRect } from '../worldMap/types';
 
 export const WORLD_WIDTH = GAME_CONFIG.world.width;
@@ -28,7 +29,10 @@ export type PlayerEntity = {
   maxStamina: number;
   facing: Facing;
   lastInputSeq: number;
+  /** Legacy resource snapshot used by current HUD/client snapshots. Keep synced with inventoryItems. */
   inventory: Inventory;
+  /** Generic inventory stacks used by crafting/building/item systems. */
+  inventoryItems: InventoryItemStack[];
   input: MovementKeys;
   /** epoch ms when next gather is allowed */
   nextGatherAt: number;
