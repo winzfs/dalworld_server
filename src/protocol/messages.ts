@@ -41,6 +41,7 @@ export type ResourceSnapshot = {
   y: number;
   cellX: number;
   cellY: number;
+  assetUrl?: string;
   hp: number;
   maxHp: number;
   respawnAt: number;
