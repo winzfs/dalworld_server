@@ -20,6 +20,9 @@ import type { GameWorldMap } from '../worldMap/types';
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
 const MAP_STORAGE_KEY = 'world:default-map';
+const BUILDING_GRID_WIDTH = 256;
+const BUILDING_GRID_HEIGHT = 256;
+const BUILDING_GRID_MAX_Z = 8;
 
 type RateLimitEntry = { count: number; resetAt: number };
 
@@ -27,7 +30,11 @@ export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
   private readonly sessions = new Map<WebSocket, string>();
   private readonly rateLimits = new Map<WebSocket, RateLimitEntry>();
-  private readonly buildingGrid = new BuildingGrid({ width: 64, height: 64, maxZ: 8 });
+  private readonly buildingGrid = new BuildingGrid({
+    width: BUILDING_GRID_WIDTH,
+    height: BUILDING_GRID_HEIGHT,
+    maxZ: BUILDING_GRID_MAX_Z,
+  });
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
   private worldMap: GameWorldMap | null = null;
