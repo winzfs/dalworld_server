@@ -10,6 +10,9 @@ import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_HEIGHT, WORLD_WIDTH } from '../sim/WorldState';
+import { BuildingGrid } from '../systems/building/BuildingGrid';
+import { BuildingService } from '../systems/building/BuildingService';
+import { InventoryStore } from '../systems/inventory/InventoryStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap } from '../worldMap/types';
@@ -24,6 +27,7 @@ export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
   private readonly sessions = new Map<WebSocket, string>();
   private readonly rateLimits = new Map<WebSocket, RateLimitEntry>();
+  private readonly buildingGrid = new BuildingGrid({ width: 64, height: 64, maxZ: 8 });
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
   private worldMap: GameWorldMap | null = null;
@@ -71,6 +75,11 @@ export class GameRoom extends DurableObject<Env> {
       serverTime: now,
     });
 
+    this.send(server, {
+      type: 'BUILD_SNAPSHOT',
+      snapshot: this.buildingGrid.toSnapshot(),
+    });
+
     this.simulation.world.pushEvent({ type: 'player_joined', playerId });
     this.ensureLoop();
 
@@ -108,6 +117,10 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'hello':
         return;
+      case 'BUILD_PLACE_REQUEST':
+      case 'BUILD_REMOVE_REQUEST':
+        this.handleBuildingMessage(socket, playerId, message);
+        return;
       case 'input': {
         applyInput(player, message.seq, message.keys, message.facing);
 
@@ -128,7 +141,7 @@ export class GameRoom extends DurableObject<Env> {
             player.y = nextY;
           }
 
-          player.input = { up: false, down: false, left: false, right: false };
+          player.input = { up: false, down: false, right: false, left: false };
         }
 
         return;
@@ -144,6 +157,42 @@ export class GameRoom extends DurableObject<Env> {
           player.lastInputSeq = Math.max(player.lastInputSeq, message.seq);
         }
         return;
+      }
+    }
+  }
+
+  private handleBuildingMessage(
+    socket: WebSocket,
+    playerId: string,
+    message: ClientToServerMessage,
+  ): void {
+    const player = this.simulation.world.players.get(playerId);
+    if (!player) return;
+
+    const service = new BuildingService({
+      grid: this.buildingGrid,
+      getInventory: () => new InventoryStore(playerId, [
+        { itemId: 'wood', quantity: player.inventory.wood },
+        { itemId: 'stone', quantity: player.inventory.stone },
+      ]),
+      createEntityId: () => crypto.randomUUID(),
+      now: () => Date.now(),
+    });
+
+    const result = message.type === 'BUILD_PLACE_REQUEST'
+      ? service.place(playerId, message)
+      : service.remove(playerId, message);
+
+    for (const event of result.events) {
+      if (event.type === 'INVENTORY_SNAPSHOT') {
+        player.inventory.wood = event.items.find((item) => item.itemId === 'wood')?.quantity ?? 0;
+        player.inventory.stone = event.items.find((item) => item.itemId === 'stone')?.quantity ?? 0;
+      }
+
+      if (event.type === 'BUILD_REJECTED' || event.type === 'INVENTORY_SNAPSHOT') {
+        this.send(socket, event);
+      } else {
+        this.broadcast(event);
       }
     }
   }
@@ -204,6 +253,17 @@ export class GameRoom extends DurableObject<Env> {
         } catch {
           this.closeSession(socket);
         }
+      }
+    }
+  }
+
+  private broadcast(message: ServerToClientMessage): void {
+    const payload = JSON.stringify(message);
+    for (const socket of this.sessions.keys()) {
+      try {
+        socket.send(payload);
+      } catch {
+        this.closeSession(socket);
       }
     }
   }
