@@ -1,5 +1,6 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { Facing, MovementKeys } from '../protocol/messages';
+import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { clamp, normalize } from '../utils/math';
 import {
   WORLD_HEIGHT,
@@ -50,15 +51,19 @@ export function applyInput(
   if (facing) player.facing = facing;
 }
 
+export type PlayerSystemUpdateOptions = {
+  buildingGrid?: BuildingGrid;
+};
+
 export class PlayerSystem {
-  update(world: WorldState, dt: number): void {
+  update(world: WorldState, dt: number, options: PlayerSystemUpdateOptions = {}): void {
     for (const player of world.players.values()) {
-      this.movePlayer(player, dt);
+      this.movePlayer(player, dt, options.buildingGrid);
       this.regenerate(player, dt);
     }
   }
 
-  private movePlayer(player: PlayerEntity, dt: number): void {
+  private movePlayer(player: PlayerEntity, dt: number, buildingGrid?: BuildingGrid): void {
     let dx = 0;
     let dy = 0;
     if (player.input.left) dx -= 1;
@@ -69,14 +74,30 @@ export class PlayerSystem {
     if (dx === 0 && dy === 0) return;
 
     const direction = normalize(dx, dy);
-    player.x = clamp(player.x + direction.x * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
-    player.y = clamp(player.y + direction.y * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+    const nextX = clamp(player.x + direction.x * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_WIDTH - PLAYER_RADIUS);
+    const nextY = clamp(player.y + direction.y * PLAYER_SPEED * dt, PLAYER_RADIUS, WORLD_HEIGHT - PLAYER_RADIUS);
+
+    if (this.canOccupy(nextX, player.y, buildingGrid)) {
+      player.x = nextX;
+    }
+
+    if (this.canOccupy(player.x, nextY, buildingGrid)) {
+      player.y = nextY;
+    }
 
     if (Math.abs(direction.x) > Math.abs(direction.y)) {
       player.facing = direction.x > 0 ? 'right' : 'left';
     } else {
       player.facing = direction.y > 0 ? 'down' : 'up';
     }
+  }
+
+  private canOccupy(x: number, y: number, buildingGrid?: BuildingGrid): boolean {
+    if (!buildingGrid) {
+      return true;
+    }
+
+    return buildingGrid.canOccupyWorldCircle(x, y, PLAYER_RADIUS);
   }
 
   private regenerate(player: PlayerEntity, dt: number): void {
