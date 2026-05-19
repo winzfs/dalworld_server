@@ -6,7 +6,9 @@ export { GameRoom };
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  Pragma: 'no-cache',
 };
 
 export default {
@@ -45,12 +47,12 @@ export default {
 
     if (url.pathname === '/health') {
       return new Response(JSON.stringify({ ok: true, service: 'dalworld-server' }), {
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers: { 'Content-Type': 'application/json; charset=utf-8', ...CORS_HEADERS },
       });
     }
 
     return new Response('dalworld server is running', {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', ...CORS_HEADERS },
     });
   },
 } satisfies ExportedHandler<Env>;
