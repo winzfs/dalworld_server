@@ -5,6 +5,7 @@ import type {
   BuildDoorToggleRequest,
   BuildPlaceRequest,
   BuildRemoveRequest,
+  BuildUpdateRequest,
   BuildingServerEvent,
   PlacedBuildPart,
 } from "./BuildingTypes";
@@ -16,9 +17,7 @@ export type BuildingServiceOptions = {
   now(): number;
 };
 
-export type BuildingCommandResult = {
-  events: BuildingServerEvent[];
-};
+export type BuildingCommandResult = { events: BuildingServerEvent[] };
 
 export class BuildingService {
   private readonly grid: BuildingGrid;
@@ -35,63 +34,29 @@ export class BuildingService {
 
   createInitialSyncEvents(ownerId: string): BuildingServerEvent[] {
     const inventory = this.getInventory(ownerId).toSnapshot();
-
     return [
-      {
-        type: "BUILD_SNAPSHOT",
-        snapshot: this.grid.toSnapshot(),
-      },
-      {
-        type: "INVENTORY_SNAPSHOT",
-        ownerId: inventory.ownerId,
-        items: inventory.items,
-        updatedAt: inventory.updatedAt,
-      },
+      { type: "BUILD_SNAPSHOT", snapshot: this.grid.toSnapshot() },
+      { type: "INVENTORY_SNAPSHOT", ownerId: inventory.ownerId, items: inventory.items, updatedAt: inventory.updatedAt },
     ];
   }
 
   place(ownerId: string, request: unknown): BuildingCommandResult {
     const parsed = this.parsePlaceRequest(request);
-
-    if (!parsed.ok) {
-      return this.reject(parsed.requestId, parsed.reason);
-    }
+    if (!parsed.ok) return this.reject(parsed.requestId, parsed.reason);
 
     const definition = getBuildPartDefinition(parsed.request.partId);
+    if (!definition) return this.reject(parsed.request.requestId, "존재하지 않는 건설 부품입니다.");
 
-    if (!definition) {
-      return this.reject(parsed.request.requestId, "존재하지 않는 건설 부품입니다.");
-    }
-
-    const placementValidation = this.grid.canPlace(
-      definition,
-      parsed.request.x,
-      parsed.request.y,
-      parsed.request.z,
-      parsed.request.rotation,
-    );
-
-    if (!placementValidation.ok) {
-      return this.reject(parsed.request.requestId, placementValidation.reason);
-    }
+    const placementValidation = this.grid.canPlace(definition, parsed.request.x, parsed.request.y, parsed.request.z, parsed.request.rotation);
+    if (!placementValidation.ok) return this.reject(parsed.request.requestId, placementValidation.reason);
 
     const inventory = this.getInventory(ownerId);
     const consumeResult = inventory.consume(definition.placementCost);
-
     if (!consumeResult.ok) {
       return {
         events: [
-          {
-            type: "BUILD_REJECTED",
-            requestId: parsed.request.requestId,
-            reason: consumeResult.reason,
-          },
-          {
-            type: "INVENTORY_SNAPSHOT",
-            ownerId: consumeResult.snapshot.ownerId,
-            items: consumeResult.snapshot.items,
-            updatedAt: consumeResult.snapshot.updatedAt,
-          },
+          { type: "BUILD_REJECTED", requestId: parsed.request.requestId, reason: consumeResult.reason },
+          { type: "INVENTORY_SNAPSHOT", ownerId: consumeResult.snapshot.ownerId, items: consumeResult.snapshot.items, updatedAt: consumeResult.snapshot.updatedAt },
         ],
       };
     }
@@ -112,229 +77,127 @@ export class BuildingService {
 
     return {
       events: [
-        {
-          type: "BUILD_PLACED",
-          part,
-        },
-        {
-          type: "INVENTORY_SNAPSHOT",
-          ownerId: consumeResult.snapshot.ownerId,
-          items: consumeResult.snapshot.items,
-          updatedAt: consumeResult.snapshot.updatedAt,
-        },
+        { type: "BUILD_PLACED", part },
+        { type: "INVENTORY_SNAPSHOT", ownerId: consumeResult.snapshot.ownerId, items: consumeResult.snapshot.items, updatedAt: consumeResult.snapshot.updatedAt },
       ],
     };
   }
 
-  remove(ownerId: string, request: unknown): BuildingCommandResult {
-    const parsed = this.parseRemoveRequest(request);
-
-    if (!parsed.ok) {
-      return this.reject(parsed.requestId, parsed.reason);
-    }
+  update(ownerId: string, request: unknown): BuildingCommandResult {
+    const parsed = this.parseUpdateRequest(request);
+    if (!parsed.ok) return this.reject(parsed.requestId, parsed.reason);
 
     const target = this.grid.getById(parsed.request.entityId);
+    if (!target) return this.reject(parsed.request.requestId, "수정할 건설물을 찾을 수 없습니다.");
+    if (target.ownerId !== ownerId) return this.reject(parsed.request.requestId, "다른 플레이어의 건설물은 수정할 수 없습니다.");
 
-    if (!target) {
-      return this.reject(parsed.request.requestId, "철거할 건설물을 찾을 수 없습니다.");
-    }
+    const validation = this.grid.canMove(target.entityId, parsed.request.x, parsed.request.y, parsed.request.z, parsed.request.rotation);
+    if (!validation.ok) return this.reject(parsed.request.requestId, validation.reason);
 
-    if (target.ownerId !== ownerId) {
-      return this.reject(parsed.request.requestId, "다른 플레이어의 건설물은 철거할 수 없습니다.");
-    }
+    const updated = this.grid.move(target.entityId, parsed.request.x, parsed.request.y, parsed.request.z, parsed.request.rotation);
+    if (!updated) return this.reject(parsed.request.requestId, "건설물 수정에 실패했습니다.");
 
-    if (this.grid.hasAnyPartAbove(target.x, target.y, target.z)) {
-      return this.reject(parsed.request.requestId, "위에 다른 건설물이 있어 먼저 제거해야 합니다.");
-    }
+    return { events: [{ type: "BUILD_UPDATED", part: updated }] };
+  }
+
+  remove(ownerId: string, request: unknown): BuildingCommandResult {
+    const parsed = this.parseRemoveRequest(request);
+    if (!parsed.ok) return this.reject(parsed.requestId, parsed.reason);
+
+    const target = this.grid.getById(parsed.request.entityId);
+    if (!target) return this.reject(parsed.request.requestId, "철거할 건설물을 찾을 수 없습니다.");
+    if (target.ownerId !== ownerId) return this.reject(parsed.request.requestId, "다른 플레이어의 건설물은 철거할 수 없습니다.");
+    if (this.grid.hasAnyPartAbove(target.x, target.y, target.z)) return this.reject(parsed.request.requestId, "위에 다른 건설물이 있어 먼저 제거해야 합니다.");
 
     const definition = getBuildPartDefinition(target.partId);
-
-    if (!definition) {
-      return this.reject(parsed.request.requestId, "건설물 정의를 찾을 수 없습니다.");
-    }
+    if (!definition) return this.reject(parsed.request.requestId, "건설물 정의를 찾을 수 없습니다.");
 
     this.grid.remove(target.entityId);
 
     const inventory = this.getInventory(ownerId);
-    for (const refund of definition.refundOnRemove) {
-      inventory.add(refund.itemId, refund.quantity);
-    }
-
+    for (const refund of definition.refundOnRemove) inventory.add(refund.itemId, refund.quantity);
     const inventorySnapshot = inventory.toSnapshot();
 
     return {
       events: [
-        {
-          type: "BUILD_REMOVED",
-          entityId: target.entityId,
-        },
-        {
-          type: "INVENTORY_SNAPSHOT",
-          ownerId: inventorySnapshot.ownerId,
-          items: inventorySnapshot.items,
-          updatedAt: inventorySnapshot.updatedAt,
-        },
+        { type: "BUILD_REMOVED", entityId: target.entityId },
+        { type: "INVENTORY_SNAPSHOT", ownerId: inventorySnapshot.ownerId, items: inventorySnapshot.items, updatedAt: inventorySnapshot.updatedAt },
       ],
     };
   }
 
   toggleDoor(ownerId: string, request: unknown): BuildingCommandResult {
     const parsed = this.parseDoorToggleRequest(request);
-
-    if (!parsed.ok) {
-      return this.reject(parsed.requestId, parsed.reason);
-    }
+    if (!parsed.ok) return this.reject(parsed.requestId, parsed.reason);
 
     const target = this.grid.getById(parsed.request.entityId);
-
-    if (!target) {
-      return this.reject(parsed.request.requestId, "문을 찾을 수 없습니다.");
-    }
+    if (!target) return this.reject(parsed.request.requestId, "문을 찾을 수 없습니다.");
 
     const definition = getBuildPartDefinition(target.partId);
-
-    if (definition?.category !== "door") {
-      return this.reject(parsed.request.requestId, "문만 열고 닫을 수 있습니다.");
-    }
-
-    if (target.ownerId !== ownerId) {
-      return this.reject(parsed.request.requestId, "다른 플레이어의 문은 조작할 수 없습니다.");
-    }
+    if (definition?.category !== "door") return this.reject(parsed.request.requestId, "문만 열고 닫을 수 있습니다.");
+    if (target.ownerId !== ownerId) return this.reject(parsed.request.requestId, "다른 플레이어의 문은 조작할 수 없습니다.");
 
     const open = !Boolean(target.state?.open);
-    const updated: PlacedBuildPart = {
-      ...target,
-      state: { ...target.state, open },
-    };
-
+    const updated: PlacedBuildPart = { ...target, state: { ...target.state, open } };
     this.grid.updatePart(updated);
 
-    return {
-      events: [
-        {
-          type: "BUILD_DOOR_UPDATED",
-          entityId: updated.entityId,
-          open,
-        },
-      ],
-    };
+    return { events: [{ type: "BUILD_DOOR_UPDATED", entityId: updated.entityId, open }] };
   }
 
   private parsePlaceRequest(request: unknown):
     | { ok: true; request: BuildPlaceRequest }
     | { ok: false; requestId: string; reason: string } {
-    if (!this.isRecord(request)) {
-      return { ok: false, requestId: "unknown", reason: "건설 요청 형식이 올바르지 않습니다." };
-    }
+    const base = this.parseCoordinateRequest(request, "BUILD_PLACE_REQUEST");
+    if (!base.ok) return base;
+    if (!isBuildPartId(base.record.partId)) return { ok: false, requestId: base.requestId, reason: "알 수 없는 건설 부품입니다." };
+    return { ok: true, request: { type: "BUILD_PLACE_REQUEST", requestId: base.requestId, partId: base.record.partId, x: base.x, y: base.y, z: base.z, rotation: base.rotation } };
+  }
 
+  private parseUpdateRequest(request: unknown):
+    | { ok: true; request: BuildUpdateRequest }
+    | { ok: false; requestId: string; reason: string } {
+    const base = this.parseCoordinateRequest(request, "BUILD_UPDATE_REQUEST");
+    if (!base.ok) return base;
+    if (typeof base.record.entityId !== "string" || base.record.entityId.length === 0) return { ok: false, requestId: base.requestId, reason: "수정할 entityId가 필요합니다." };
+    return { ok: true, request: { type: "BUILD_UPDATE_REQUEST", requestId: base.requestId, entityId: base.record.entityId, x: base.x, y: base.y, z: base.z, rotation: base.rotation } };
+  }
+
+  private parseCoordinateRequest(request: unknown, type: string):
+    | { ok: true; record: Record<string, unknown>; requestId: string; x: number; y: number; z: number; rotation: 0 | 1 | 2 | 3 }
+    | { ok: false; requestId: string; reason: string } {
+    if (!this.isRecord(request)) return { ok: false, requestId: "unknown", reason: "건설 요청 형식이 올바르지 않습니다." };
     const requestId = typeof request.requestId === "string" ? request.requestId : "unknown";
-
-    if (request.type !== "BUILD_PLACE_REQUEST") {
-      return { ok: false, requestId, reason: "건설 배치 요청 타입이 올바르지 않습니다." };
-    }
-
-    if (typeof request.requestId !== "string" || request.requestId.length === 0) {
-      return { ok: false, requestId, reason: "requestId가 필요합니다." };
-    }
-
-    if (!isBuildPartId(request.partId)) {
-      return { ok: false, requestId, reason: "알 수 없는 건설 부품입니다." };
-    }
-
-    if (!Number.isInteger(request.x) || !Number.isInteger(request.y) || !Number.isInteger(request.z)) {
-      return { ok: false, requestId, reason: "건설 좌표는 정수여야 합니다." };
-    }
-
-    if (![0, 1, 2, 3].includes(Number(request.rotation))) {
-      return { ok: false, requestId, reason: "회전값이 올바르지 않습니다." };
-    }
-
-    return {
-      ok: true,
-      request: {
-        type: "BUILD_PLACE_REQUEST",
-        requestId: request.requestId,
-        partId: request.partId,
-        x: request.x,
-        y: request.y,
-        z: request.z,
-        rotation: request.rotation as 0 | 1 | 2 | 3,
-      },
-    };
+    if (request.type !== type) return { ok: false, requestId, reason: "건설 요청 타입이 올바르지 않습니다." };
+    if (typeof request.requestId !== "string" || request.requestId.length === 0) return { ok: false, requestId, reason: "requestId가 필요합니다." };
+    if (!Number.isInteger(request.x) || !Number.isInteger(request.y) || !Number.isInteger(request.z)) return { ok: false, requestId, reason: "건설 좌표는 정수여야 합니다." };
+    if (![0, 1, 2, 3].includes(Number(request.rotation))) return { ok: false, requestId, reason: "회전값이 올바르지 않습니다." };
+    return { ok: true, record: request, requestId: request.requestId, x: request.x, y: request.y, z: request.z, rotation: request.rotation as 0 | 1 | 2 | 3 };
   }
 
   private parseRemoveRequest(request: unknown):
     | { ok: true; request: BuildRemoveRequest }
     | { ok: false; requestId: string; reason: string } {
-    if (!this.isRecord(request)) {
-      return { ok: false, requestId: "unknown", reason: "철거 요청 형식이 올바르지 않습니다." };
-    }
-
+    if (!this.isRecord(request)) return { ok: false, requestId: "unknown", reason: "철거 요청 형식이 올바르지 않습니다." };
     const requestId = typeof request.requestId === "string" ? request.requestId : "unknown";
-
-    if (request.type !== "BUILD_REMOVE_REQUEST") {
-      return { ok: false, requestId, reason: "철거 요청 타입이 올바르지 않습니다." };
-    }
-
-    if (typeof request.requestId !== "string" || request.requestId.length === 0) {
-      return { ok: false, requestId, reason: "requestId가 필요합니다." };
-    }
-
-    if (typeof request.entityId !== "string" || request.entityId.length === 0) {
-      return { ok: false, requestId, reason: "철거할 entityId가 필요합니다." };
-    }
-
-    return {
-      ok: true,
-      request: {
-        type: "BUILD_REMOVE_REQUEST",
-        requestId: request.requestId,
-        entityId: request.entityId,
-      },
-    };
+    if (request.type !== "BUILD_REMOVE_REQUEST") return { ok: false, requestId, reason: "철거 요청 타입이 올바르지 않습니다." };
+    if (typeof request.requestId !== "string" || request.requestId.length === 0) return { ok: false, requestId, reason: "requestId가 필요합니다." };
+    if (typeof request.entityId !== "string" || request.entityId.length === 0) return { ok: false, requestId, reason: "철거할 entityId가 필요합니다." };
+    return { ok: true, request: { type: "BUILD_REMOVE_REQUEST", requestId: request.requestId, entityId: request.entityId } };
   }
 
   private parseDoorToggleRequest(request: unknown):
     | { ok: true; request: BuildDoorToggleRequest }
     | { ok: false; requestId: string; reason: string } {
-    if (!this.isRecord(request)) {
-      return { ok: false, requestId: "unknown", reason: "문 조작 요청 형식이 올바르지 않습니다." };
-    }
-
+    if (!this.isRecord(request)) return { ok: false, requestId: "unknown", reason: "문 조작 요청 형식이 올바르지 않습니다." };
     const requestId = typeof request.requestId === "string" ? request.requestId : "unknown";
-
-    if (request.type !== "BUILD_DOOR_TOGGLE_REQUEST") {
-      return { ok: false, requestId, reason: "문 조작 요청 타입이 올바르지 않습니다." };
-    }
-
-    if (typeof request.requestId !== "string" || request.requestId.length === 0) {
-      return { ok: false, requestId, reason: "requestId가 필요합니다." };
-    }
-
-    if (typeof request.entityId !== "string" || request.entityId.length === 0) {
-      return { ok: false, requestId, reason: "조작할 문 entityId가 필요합니다." };
-    }
-
-    return {
-      ok: true,
-      request: {
-        type: "BUILD_DOOR_TOGGLE_REQUEST",
-        requestId: request.requestId,
-        entityId: request.entityId,
-      },
-    };
+    if (request.type !== "BUILD_DOOR_TOGGLE_REQUEST") return { ok: false, requestId, reason: "문 조작 요청 타입이 올바르지 않습니다." };
+    if (typeof request.requestId !== "string" || request.requestId.length === 0) return { ok: false, requestId, reason: "requestId가 필요합니다." };
+    if (typeof request.entityId !== "string" || request.entityId.length === 0) return { ok: false, requestId, reason: "조작할 문 entityId가 필요합니다." };
+    return { ok: true, request: { type: "BUILD_DOOR_TOGGLE_REQUEST", requestId: request.requestId, entityId: request.entityId } };
   }
 
   private reject(requestId: string, reason: string): BuildingCommandResult {
-    return {
-      events: [
-        {
-          type: "BUILD_REJECTED",
-          requestId,
-          reason,
-        },
-      ],
-    };
+    return { events: [{ type: "BUILD_REJECTED", requestId, reason }] };
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
