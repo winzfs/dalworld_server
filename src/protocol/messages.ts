@@ -1,3 +1,4 @@
+import type { BuildingServerEvent, BuildPlaceRequest, BuildRemoveRequest } from '../systems/building/BuildingTypes';
 import type { GameWorldMap, WorldMapSourceRect } from '../worldMap/types';
 
 export type MovementKeys = {
@@ -80,6 +81,8 @@ export type PublicGameConfig = {
   gameplay: PublicGameplayConfig;
 };
 
+export type BuildingClientMessage = BuildPlaceRequest | BuildRemoveRequest;
+
 export type ClientToServerMessage =
   | { type: 'hello'; name?: string }
   | {
@@ -97,7 +100,8 @@ export type ClientToServerMessage =
       seq: number;
       resourceId?: string;
     }
-  | { type: 'ping'; now: number };
+  | { type: 'ping'; now: number }
+  | BuildingClientMessage;
 
 export type ServerEvent =
   | { type: 'player_joined'; playerId: string }
@@ -125,4 +129,5 @@ export type ServerToClientMessage =
       monsters: MonsterSnapshot[];
     }
   | { type: 'event'; serverTime: number; event: ServerEvent }
-  | { type: 'pong'; now: number };
+  | { type: 'pong'; now: number }
+  | BuildingServerEvent;
