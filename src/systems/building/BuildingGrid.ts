@@ -1,5 +1,6 @@
 import { getBuildPartDefinition } from "./BuildingParts";
 import type {
+  BuildCategory,
   BuildCorner,
   BuildEdge,
   BuildPartDefinition,
@@ -30,6 +31,8 @@ type Point = { x: number; y: number };
 const ISO_TILE_WIDTH = 64;
 const ISO_TILE_HEIGHT = 32;
 const ISO_LAYER_HEIGHT = 32;
+const STACKABLE_EDGE_CATEGORIES: BuildCategory[] = ["wall", "door", "window"];
+const UPPER_TILE_SUPPORT_CATEGORIES: BuildCategory[] = ["floor", "wall", "door", "window", "support"];
 
 export class BuildingGrid {
   private readonly width: number;
@@ -72,11 +75,13 @@ export class BuildingGrid {
     if (!slotValidation.ok) return slotValidation;
 
     if (definition.allowedOn === "ground") {
-      return z === 0 ? { ok: true } : { ok: false, reason: "이 부품은 지면에만 배치할 수 있습니다." };
+      if (z === 0) return { ok: true };
+      if (definition.category === "floor") return this.validateUpperTileSupport(x, y, z);
+      return { ok: false, reason: "이 부품은 지면에만 배치할 수 있습니다." };
     }
 
     if (definition.requiresSupport) {
-      const supportValidation = this.validateSupport(definition, x, y, z);
+      const supportValidation = this.validateSupport(definition, x, y, z, rotation as BuildRotation);
       if (!supportValidation.ok) return supportValidation;
     }
 
@@ -195,15 +200,23 @@ export class BuildingGrid {
     return { ok: true };
   }
 
-  private validateSupport(definition: BuildPartDefinition, x: number, y: number, z: number): BuildingValidationResult {
+  private validateSupport(definition: BuildPartDefinition, x: number, y: number, z: number, rotation: BuildRotation): BuildingValidationResult {
     if (z === 0) {
       const floor = this.getTilePartAt(x, y, 0);
       if (!floor) return { ok: false, reason: "이 부품은 바닥 위에만 배치할 수 있습니다." };
       if (definition.allowedOn !== "any" && !definition.allowedOn.includes(floor.partId)) return { ok: false, reason: `이 부품은 ${floor.partId} 위에 배치할 수 없습니다.` };
       return { ok: true };
     }
+
     const belowCell = this.cells.get(this.toCellKey(x, y, z - 1));
     if (!belowCell) return { ok: false, reason: "아래에 지지하는 건설물이 없습니다." };
+
+    if (definition.slotKind === "edge" && STACKABLE_EDGE_CATEGORIES.includes(definition.category)) {
+      const sameEdgePart = this.getEdgePartFromCell(belowCell, rotation);
+      const supportDefinition = sameEdgePart ? getBuildPartDefinition(sameEdgePart.partId) : null;
+      if (supportDefinition && STACKABLE_EDGE_CATEGORIES.includes(supportDefinition.category)) return { ok: true };
+    }
+
     const belowParts = [belowCell.tile, ...Object.values(belowCell.edges), ...Object.values(belowCell.corners)]
       .filter((entityId): entityId is string => typeof entityId === "string")
       .map((entityId) => this.partsById.get(entityId))
@@ -211,6 +224,28 @@ export class BuildingGrid {
     if (belowParts.length === 0) return { ok: false, reason: "아래에 지지하는 건설물이 없습니다." };
     if (definition.allowedOn === "any") return { ok: true };
     return belowParts.some((part) => definition.allowedOn.includes(part.partId)) ? { ok: true } : { ok: false, reason: "아래 건설물이 이 부품을 지지할 수 없습니다." };
+  }
+
+  private validateUpperTileSupport(x: number, y: number, z: number): BuildingValidationResult {
+    if (z <= 0) return { ok: true };
+    const belowCell = this.cells.get(this.toCellKey(x, y, z - 1));
+    if (!belowCell) return { ok: false, reason: "위층 바닥을 받칠 벽/기둥이 없습니다." };
+
+    const supported = [belowCell.tile, ...Object.values(belowCell.edges), ...Object.values(belowCell.corners)]
+      .filter((entityId): entityId is string => typeof entityId === "string")
+      .map((entityId) => this.partsById.get(entityId))
+      .filter((part): part is PlacedBuildPart => Boolean(part))
+      .some((part) => {
+        const supportDefinition = getBuildPartDefinition(part.partId);
+        return Boolean(supportDefinition && UPPER_TILE_SUPPORT_CATEGORIES.includes(supportDefinition.category));
+      });
+
+    return supported ? { ok: true } : { ok: false, reason: "위층 바닥을 받칠 벽/기둥이 없습니다." };
+  }
+
+  private getEdgePartFromCell(cell: CellBuildSlots, rotation: BuildRotation): PlacedBuildPart | null {
+    const entityId = cell.edges[rotationToEdge(rotation)];
+    return entityId ? this.partsById.get(entityId) ?? null : null;
   }
 
   private getOrCreateCell(x: number, y: number, z: number): CellBuildSlots {
