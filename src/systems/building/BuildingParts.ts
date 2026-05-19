@@ -4,11 +4,10 @@ const FLOOR_SUPPORTS: BuildPartId[] = [
   "floor_1x1",
   "stone_floor_1x1",
   "deck_floor_1x1",
-  "wood_stairs",
-  "stone_stairs",
   "wood_round_floor",
   "stone_round_floor",
 ];
+const STAIR_SUPPORTS: BuildPartId[] = [...FLOOR_SUPPORTS, "wood_stairs", "stone_stairs"];
 const WALL_SUPPORTS: BuildPartId[] = [
   "thin_wall",
   "stone_wall",
@@ -38,8 +37,8 @@ export const BUILD_PARTS: Record<BuildPartId, BuildPartDefinition> = {
   floor_1x1: part("floor_1x1", "floor", "tile", false, false, "ground", [...WOOD_1], [...WOOD_1]),
   stone_floor_1x1: part("stone_floor_1x1", "floor", "tile", false, false, "ground", [...STONE_2], [...STONE_1]),
   deck_floor_1x1: part("deck_floor_1x1", "floor", "tile", false, false, "ground", [...WOOD_2], [...WOOD_1]),
-  wood_stairs: part("wood_stairs", "floor", "tile", false, true, FLOOR_SUPPORTS, [...WOOD_3], [...WOOD_1]),
-  stone_stairs: part("stone_stairs", "floor", "tile", false, true, FLOOR_SUPPORTS, [...STONE_4], [...STONE_2]),
+  wood_stairs: part("wood_stairs", "floor", "edge", false, true, STAIR_SUPPORTS, [...WOOD_3], [...WOOD_1]),
+  stone_stairs: part("stone_stairs", "floor", "edge", false, true, STAIR_SUPPORTS, [...STONE_4], [...STONE_2]),
   wood_round_floor: part("wood_round_floor", "floor", "tile", false, false, "ground", [...WOOD_2], [...WOOD_1]),
   stone_round_floor: part("stone_round_floor", "floor", "tile", false, false, "ground", [...STONE_3], [...STONE_1]),
 
