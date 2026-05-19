@@ -2,28 +2,29 @@ import type { InventoryItemStack } from "../inventory/InventoryStore";
 
 export type BuildPartId =
   | "floor_1x1"
-  | "wall_ne"
-  | "wall_nw"
-  | "corner"
-  | "column"
-  | "stair"
-  | "roof"
-  | "door";
+  | "thin_wall"
+  | "roof_1x1"
+  | "pillar"
+  | "door"
+  | "window";
 
 export type BuildCategory =
   | "floor"
   | "wall"
   | "support"
-  | "stair"
   | "roof"
   | "door"
-  | "decor";
+  | "window";
 
+export type BuildSlotKind = "tile" | "edge" | "corner";
+export type BuildEdge = "north" | "east" | "south" | "west";
+export type BuildCorner = "nw" | "ne" | "se" | "sw";
 export type BuildRotation = 0 | 1 | 2 | 3;
 
 export type BuildPartDefinition = {
   id: BuildPartId;
   category: BuildCategory;
+  slotKind: BuildSlotKind;
   size: {
     w: number;
     d: number;
@@ -32,9 +33,12 @@ export type BuildPartDefinition = {
   blocksMovement: boolean;
   requiresSupport: boolean;
   allowedOn: "any" | "ground" | BuildPartId[];
-  allowStackSameCell: boolean;
   placementCost: InventoryItemStack[];
   refundOnRemove: InventoryItemStack[];
+};
+
+export type BuildPartState = {
+  open?: boolean;
 };
 
 export type PlacedBuildPart = {
@@ -45,6 +49,7 @@ export type PlacedBuildPart = {
   y: number;
   z: number;
   rotation: BuildRotation;
+  state?: BuildPartState;
   createdAt: number;
 };
 
@@ -65,6 +70,12 @@ export type BuildPlaceRequest = {
 
 export type BuildRemoveRequest = {
   type: "BUILD_REMOVE_REQUEST";
+  requestId: string;
+  entityId: string;
+};
+
+export type BuildDoorToggleRequest = {
+  type: "BUILD_DOOR_TOGGLE_REQUEST";
   requestId: string;
   entityId: string;
 };
@@ -90,6 +101,12 @@ export type BuildSnapshotEvent = {
   snapshot: BuildingSnapshot;
 };
 
+export type BuildDoorUpdatedEvent = {
+  type: "BUILD_DOOR_UPDATED";
+  entityId: string;
+  open: boolean;
+};
+
 export type InventorySnapshotEvent = {
   type: "INVENTORY_SNAPSHOT";
   ownerId: string;
@@ -102,4 +119,13 @@ export type BuildingServerEvent =
   | BuildRemovedEvent
   | BuildRejectedEvent
   | BuildSnapshotEvent
+  | BuildDoorUpdatedEvent
   | InventorySnapshotEvent;
+
+export function rotationToEdge(rotation: BuildRotation): BuildEdge {
+  return ["north", "east", "south", "west"][rotation];
+}
+
+export function rotationToCorner(rotation: BuildRotation): BuildCorner {
+  return ["nw", "ne", "se", "sw"][rotation];
+}
