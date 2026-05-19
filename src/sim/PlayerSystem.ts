@@ -14,6 +14,8 @@ export const PLAYER_SPEED = GAME_CONFIG.player.speed;
 export const PLAYER_MAX_HP = GAME_CONFIG.player.maxHp;
 export const PLAYER_MAX_STAMINA = GAME_CONFIG.player.maxStamina;
 export const STAMINA_REGEN_PER_SEC = GAME_CONFIG.player.staminaRegenPerSec;
+export const STARTER_BUILDING_WOOD = 200;
+export const STARTER_BUILDING_STONE = 120;
 
 export function createPlayer(id: string): PlayerEntity {
   return {
@@ -28,7 +30,7 @@ export function createPlayer(id: string): PlayerEntity {
     maxStamina: PLAYER_MAX_STAMINA,
     facing: 'down',
     lastInputSeq: 0,
-    inventory: { wood: 0, stone: 0 },
+    inventory: { wood: STARTER_BUILDING_WOOD, stone: STARTER_BUILDING_STONE },
     input: { up: false, down: false, left: false, right: false },
     nextGatherAt: 0,
   };
