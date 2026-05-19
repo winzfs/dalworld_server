@@ -104,7 +104,7 @@ export class BuildingService {
       y: parsed.request.y,
       z: parsed.request.z,
       rotation: parsed.request.rotation,
-      state: parsed.request.partId === "door" ? { open: false } : undefined,
+      state: definition.category === "door" ? { open: false } : undefined,
       createdAt: this.now(),
     };
 
@@ -191,7 +191,9 @@ export class BuildingService {
       return this.reject(parsed.request.requestId, "문을 찾을 수 없습니다.");
     }
 
-    if (target.partId !== "door") {
+    const definition = getBuildPartDefinition(target.partId);
+
+    if (definition?.category !== "door") {
       return this.reject(parsed.request.requestId, "문만 열고 닫을 수 있습니다.");
     }
 
