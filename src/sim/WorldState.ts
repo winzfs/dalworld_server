@@ -105,6 +105,7 @@ export class WorldState {
       facing: p.facing,
       lastInputSeq: p.lastInputSeq,
       inventory: { ...p.inventory },
+      inventoryItems: p.inventoryItems.map((item) => ({ ...item })),
     }));
   }
 }
