@@ -6,16 +6,18 @@ export { GameRoom };
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
+  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, X-Dalworld-Payload-Bytes',
   'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
   Pragma: 'no-cache',
 };
+
+const MAP_ENDPOINT_PREFIX = '/maps/default';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === '/maps/default') {
+    if (url.pathname === MAP_ENDPOINT_PREFIX || url.pathname.startsWith(`${MAP_ENDPOINT_PREFIX}/`)) {
       if (request.method === 'OPTIONS') {
         return new Response(null, { status: 204, headers: CORS_HEADERS });
       }
@@ -23,17 +25,19 @@ export default {
       const id = env.GAME_ROOM.idFromName('main-world');
       const room = env.GAME_ROOM.get(id);
 
-      if (request.method === 'GET') {
-        return withCors(await room.fetch(new Request('https://internal/maps/default')));
-      }
-
-      if (request.method === 'PUT') {
-        return withCors(await room.fetch(new Request('https://internal/maps/default', {
-          method: 'PUT',
-          body: request.body,
+      if (request.method === 'GET' || request.method === 'PUT') {
+        const internalUrl = new URL(request.url);
+        internalUrl.protocol = 'https:';
+        internalUrl.hostname = 'internal';
+        internalUrl.port = '';
+        return withCors(await room.fetch(new Request(internalUrl.toString(), {
+          method: request.method,
+          body: request.method === 'PUT' ? request.body : null,
           headers: request.headers,
         })));
       }
+
+      return withCors(Response.json({ ok: false, reason: 'Method not allowed' }, { status: 405 }));
     }
 
     if (url.pathname === '/ws') {
