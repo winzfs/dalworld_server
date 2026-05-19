@@ -33,6 +33,8 @@ export class GameSimulation {
       cellY: r.cellY,
       assetUrl: r.assetUrl,
       assetScale: r.assetScale,
+      displayWidth: r.displayWidth,
+      displayHeight: r.displayHeight,
       sourceRect: r.sourceRect,
       hp: r.hp,
       maxHp: r.maxHp,
