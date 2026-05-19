@@ -47,8 +47,8 @@ export const BUILD_PARTS: Record<BuildPartId, BuildPartDefinition> = {
   half_wall: part("half_wall", "wall", "edge", true, true, FLOOR_SUPPORTS, [...WOOD_1], [...WOOD_1]),
   railing: part("railing", "wall", "edge", true, true, FLOOR_SUPPORTS, [...WOOD_1], [...WOOD_1]),
   fence: part("fence", "wall", "edge", true, true, FLOOR_SUPPORTS, [...WOOD_1], [...WOOD_1]),
-  wood_round_wall: part("wood_round_wall", "wall", "edge", true, true, ["wood_round_floor", "stone_round_floor"], [...WOOD_2], [...WOOD_1]),
-  stone_round_wall: part("stone_round_wall", "wall", "edge", true, true, ["wood_round_floor", "stone_round_floor"], [...STONE_3], [...STONE_1]),
+  wood_round_wall: part("wood_round_wall", "wall", "edge", true, true, FLOOR_SUPPORTS, [...WOOD_2], [...WOOD_1]),
+  stone_round_wall: part("stone_round_wall", "wall", "edge", true, true, FLOOR_SUPPORTS, [...STONE_3], [...STONE_1]),
 
   roof_1x1: part(
     "roof_1x1",
