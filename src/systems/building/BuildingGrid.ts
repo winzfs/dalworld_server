@@ -1,7 +1,9 @@
+import { getBuildPartDefinition } from "./BuildingParts";
 import type {
   BuildCorner,
   BuildEdge,
   BuildPartDefinition,
+  BuildRotation,
   BuildingSnapshot,
   PlacedBuildPart,
 } from "./BuildingTypes";
@@ -22,6 +24,15 @@ type CellBuildSlots = {
   edges: Partial<Record<BuildEdge, string>>;
   corners: Partial<Record<BuildCorner, string>>;
 };
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+const ISO_TILE_WIDTH = 64;
+const ISO_TILE_HEIGHT = 32;
+const ISO_LAYER_HEIGHT = 32;
 
 export class BuildingGrid {
   private readonly width: number;
@@ -95,6 +106,24 @@ export class BuildingGrid {
     return { ok: true };
   }
 
+  canOccupyWorldCircle(worldX: number, worldY: number, radius: number): boolean {
+    return !this.blocksWorldCircle(worldX, worldY, radius);
+  }
+
+  blocksWorldCircle(worldX: number, worldY: number, radius: number): boolean {
+    const grid = screenToGridApprox(worldX, worldY, 0);
+
+    for (let y = grid.y - 1; y <= grid.y + 1; y += 1) {
+      for (let x = grid.x - 1; x <= grid.x + 1; x += 1) {
+        if (this.cellBlocksWorldCircle(x, y, 0, worldX, worldY, radius)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   place(part: PlacedBuildPart, definition?: BuildPartDefinition): void {
     const cell = this.getOrCreateCell(part.x, part.y, part.z);
 
@@ -150,6 +179,50 @@ export class BuildingGrid {
       parts: this.getAll(),
       updatedAt: this.updatedAt,
     };
+  }
+
+  private cellBlocksWorldCircle(x: number, y: number, z: number, worldX: number, worldY: number, radius: number): boolean {
+    const cell = this.cells.get(this.toCellKey(x, y, z));
+    if (!cell) return false;
+
+    const parts = [
+      cell.tile,
+      ...Object.values(cell.edges),
+      ...Object.values(cell.corners),
+    ]
+      .filter((entityId): entityId is string => typeof entityId === "string")
+      .map((entityId) => this.partsById.get(entityId))
+      .filter((part): part is PlacedBuildPart => Boolean(part));
+
+    for (const part of parts) {
+      if (this.partBlocksWorldCircle(part, worldX, worldY, radius)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private partBlocksWorldCircle(part: PlacedBuildPart, worldX: number, worldY: number, radius: number): boolean {
+    const definition = getBuildPartDefinition(part.partId);
+    if (!definition?.blocksMovement) return false;
+    if (part.partId === "door" && part.state?.open === true) return false;
+    if (part.partId === "floor_1x1") return false;
+    if (part.partId === "roof_1x1") return false;
+
+    const center = gridToScreen(part.x, part.y, part.z);
+
+    if (definition.slotKind === "edge") {
+      const segment = getEdgeSegment(center, part.rotation);
+      return distancePointToSegment(worldX, worldY, segment.a, segment.b) <= radius + 6;
+    }
+
+    if (definition.slotKind === "corner") {
+      const point = getCornerPoint(center, part.rotation);
+      return distance(worldX, worldY, point.x, point.y) <= radius + 8;
+    }
+
+    return pointInIsoDiamond(worldX, worldY, center, radius);
   }
 
   private validateSlotEmpty(
@@ -303,4 +376,85 @@ export class BuildingGrid {
   private touch(): void {
     this.updatedAt = Date.now();
   }
+}
+
+function gridToScreen(x: number, y: number, z: number): Point {
+  return {
+    x: (x - y) * (ISO_TILE_WIDTH / 2),
+    y: (x + y) * (ISO_TILE_HEIGHT / 2) - z * ISO_LAYER_HEIGHT,
+  };
+}
+
+function screenToGridApprox(screenX: number, screenY: number, z = 0): { x: number; y: number; z: number } {
+  const adjustedY = screenY + z * ISO_LAYER_HEIGHT;
+
+  return {
+    x: Math.floor(adjustedY / ISO_TILE_HEIGHT + screenX / ISO_TILE_WIDTH),
+    y: Math.floor(adjustedY / ISO_TILE_HEIGHT - screenX / ISO_TILE_WIDTH),
+    z,
+  };
+}
+
+function getEdgeSegment(center: Point, rotation: BuildRotation): { a: Point; b: Point } {
+  const halfW = ISO_TILE_WIDTH / 2;
+  const halfH = ISO_TILE_HEIGHT / 2;
+  const north = { x: center.x, y: center.y - halfH };
+  const east = { x: center.x + halfW, y: center.y };
+  const south = { x: center.x, y: center.y + halfH };
+  const west = { x: center.x - halfW, y: center.y };
+
+  switch (rotation) {
+    case 0:
+      return { a: west, b: north };
+    case 1:
+      return { a: north, b: east };
+    case 2:
+      return { a: east, b: south };
+    case 3:
+      return { a: south, b: west };
+  }
+}
+
+function getCornerPoint(center: Point, rotation: BuildRotation): Point {
+  const halfW = ISO_TILE_WIDTH / 2;
+  const halfH = ISO_TILE_HEIGHT / 2;
+
+  switch (rotation) {
+    case 0:
+      return { x: center.x - halfW, y: center.y };
+    case 1:
+      return { x: center.x, y: center.y - halfH };
+    case 2:
+      return { x: center.x + halfW, y: center.y };
+    case 3:
+      return { x: center.x, y: center.y + halfH };
+  }
+}
+
+function distancePointToSegment(px: number, py: number, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) {
+    return distance(px, py, a.x, a.y);
+  }
+
+  const t = Math.max(0, Math.min(1, ((px - a.x) * dx + (py - a.y) * dy) / lengthSquared));
+  const closestX = a.x + t * dx;
+  const closestY = a.y + t * dy;
+
+  return distance(px, py, closestX, closestY);
+}
+
+function distance(ax: number, ay: number, bx: number, by: number): number {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function pointInIsoDiamond(x: number, y: number, center: Point, padding: number): boolean {
+  const normalizedX = Math.abs(x - center.x) / (ISO_TILE_WIDTH / 2 + padding);
+  const normalizedY = Math.abs(y - center.y) / (ISO_TILE_HEIGHT / 2 + padding);
+  return normalizedX + normalizedY <= 1;
 }
