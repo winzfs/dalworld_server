@@ -1,5 +1,4 @@
-import { GAME_CONFIG } from '../config/gameConfig';
-import { getMonsterCollisionConfig } from '../config/monsterCollisionConfig';
+import { getMonsterDefinition } from '../systems/monster/MonsterDefinitions';
 import type { MonsterType } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { shortId } from '../utils/ids';
@@ -13,14 +12,6 @@ import {
   type WorldState,
 } from './WorldState';
 
-type MonsterTemplate = {
-  type: MonsterType;
-  hp: number;
-  speed: number;
-  detectRange: number;
-  loseRange: number;
-};
-
 type CollisionCircle = {
   x: number;
   y: number;
@@ -32,7 +23,6 @@ export type MonsterSystemUpdateOptions = {
   nowMs?: number;
 };
 
-const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
 const SPAWN_TYPES: MonsterType[] = ['wild_slime', 'sheep'];
 const START_AREA_SHEEP_COUNT = 3;
 
@@ -61,6 +51,7 @@ export class MonsterSystem {
   }
 
   private updateAi(monster: MonsterEntity, world: WorldState, dt: number, nowMs: number, buildingGrid?: BuildingGrid): void {
+    const definition = getMonsterDefinition(monster.type);
     const target = this.findOrKeepTarget(monster, world);
 
     if (!target) {
@@ -72,7 +63,7 @@ export class MonsterSystem {
     monster.targetPlayerId = target.id;
 
     const targetDistance = distance(monster.x, monster.y, target.x, target.y);
-    if (targetDistance <= GAME_CONFIG.combat.monsterAttackRange) {
+    if (targetDistance <= definition.combat.attackRange) {
       monster.state = 'attack';
       this.tryAttack(monster, target, nowMs, world);
       return;
@@ -80,15 +71,14 @@ export class MonsterSystem {
 
     monster.state = 'chase';
 
-    const collision = getMonsterCollisionConfig(monster.type);
     const direction = normalize(target.x - monster.x, target.y - monster.y);
     const deltaX = direction.x * monster.speed * dt;
     const deltaY = direction.y * monster.speed * dt;
 
     const nextX = clamp(
       monster.x + deltaX,
-      collision.radius,
-      WORLD_WIDTH - collision.radius,
+      definition.collision.radius,
+      WORLD_WIDTH - definition.collision.radius,
     );
 
     if (this.canOccupy(monster, nextX, monster.y, world, buildingGrid)) {
@@ -97,8 +87,8 @@ export class MonsterSystem {
 
     const nextY = clamp(
       monster.y + deltaY,
-      collision.radius,
-      WORLD_HEIGHT - collision.radius,
+      definition.collision.radius,
+      WORLD_HEIGHT - definition.collision.radius,
     );
 
     if (this.canOccupy(monster, monster.x, nextY, world, buildingGrid)) {
@@ -107,11 +97,13 @@ export class MonsterSystem {
   }
 
   private tryAttack(monster: MonsterEntity, target: PlayerEntity, nowMs: number, world: WorldState): void {
-    if (target.hp <= 0) return;
+    if (target.hp <= 0 || target.respawnAt > 0) return;
     if (nowMs < monster.nextAttackAt) return;
-    monster.nextAttackAt = nowMs + GAME_CONFIG.combat.monsterAttackCooldownMs;
 
-    const damage = GAME_CONFIG.combat.monsterAttackDamage;
+    const definition = getMonsterDefinition(monster.type);
+    monster.nextAttackAt = nowMs + definition.combat.attackCooldownMs;
+
+    const damage = definition.combat.attackDamage;
     target.hp = Math.max(0, target.hp - damage);
     world.pushEvent({
       type: 'combat_hit',
@@ -135,6 +127,7 @@ export class MonsterSystem {
     }
 
     for (const player of world.players.values()) {
+      if (player.respawnAt > 0) continue;
       if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, player.x, player.y, PLAYER_RADIUS)) {
         return false;
       }
@@ -165,7 +158,7 @@ export class MonsterSystem {
   private findOrKeepTarget(monster: MonsterEntity, world: WorldState): PlayerEntity | null {
     if (monster.targetPlayerId) {
       const current = world.players.get(monster.targetPlayerId);
-      if (current && current.hp > 0 && distance(monster.x, monster.y, current.x, current.y) <= monster.loseRange) {
+      if (current && current.hp > 0 && current.respawnAt === 0 && distance(monster.x, monster.y, current.x, current.y) <= monster.loseRange) {
         return current;
       }
     }
@@ -174,7 +167,7 @@ export class MonsterSystem {
     let closestDist = monster.detectRange;
 
     for (const player of world.players.values()) {
-      if (player.hp <= 0) continue;
+      if (player.hp <= 0 || player.respawnAt > 0) continue;
       const d = distance(monster.x, monster.y, player.x, player.y);
       if (d <= closestDist) {
         closest = player;
@@ -194,28 +187,27 @@ export class MonsterSystem {
   }
 
   private spawnAt(type: MonsterType, x: number, y: number): MonsterEntity {
-    const template = TEMPLATES[type];
-    const collision = getMonsterCollisionConfig(type);
+    const definition = getMonsterDefinition(type);
 
     return {
       id: shortId('mob'),
       type,
-      x: clamp(x, collision.radius, WORLD_WIDTH - collision.radius),
-      y: clamp(y, collision.radius, WORLD_HEIGHT - collision.radius),
-      hp: template.hp,
-      maxHp: template.hp,
+      x: clamp(x, definition.collision.radius, WORLD_WIDTH - definition.collision.radius),
+      y: clamp(y, definition.collision.radius, WORLD_HEIGHT - definition.collision.radius),
+      hp: definition.maxHp,
+      maxHp: definition.maxHp,
       state: 'idle',
       targetPlayerId: null,
-      speed: template.speed,
-      detectRange: template.detectRange,
-      loseRange: template.loseRange,
+      speed: definition.moveSpeed,
+      detectRange: definition.ai.detectRange,
+      loseRange: definition.ai.loseRange,
       nextAttackAt: 0,
     };
   }
 }
 
 function getCollisionCircle(type: MonsterType, x: number, y: number): CollisionCircle {
-  const collision = getMonsterCollisionConfig(type);
+  const collision = getMonsterDefinition(type).collision;
 
   return {
     x: x + collision.offsetX,
