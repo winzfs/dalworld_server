@@ -214,16 +214,10 @@ export class MonsterSystem {
   }
 
   private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
-    const selfCircle = getCollisionCircle(monster.type, x, y);
-
-    if (!this.canSpawnAt(monster.type, selfCircle.x, selfCircle.y, world, buildingGrid)) {
-      return false;
-    }
-
-    return true;
+    return this.canSpawnAt(monster.type, x, y, world, buildingGrid, monster.id);
   }
 
-  private canSpawnAt(type: MonsterType, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
+  private canSpawnAt(type: MonsterType, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid, ignoreMonsterId?: string): boolean {
     const selfCircle = getCollisionCircle(type, x, y);
 
     if (!canCircleOccupyWorldMap(this.worldMap, selfCircle.x, selfCircle.y, selfCircle.radius)) {
@@ -242,6 +236,7 @@ export class MonsterSystem {
     }
 
     for (const other of world.monsters.values()) {
+      if (other.id === ignoreMonsterId) continue;
       const otherCircle = getCollisionCircle(other.type, other.x, other.y);
       if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, otherCircle.x, otherCircle.y, otherCircle.radius)) {
         return false;
