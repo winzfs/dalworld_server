@@ -3,7 +3,7 @@ import type { MonsterType } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
-import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
+import type { GameWorldMap, WorldMapMonsterSpecOverrides, WorldMapPlacement } from '../worldMap/types';
 import {
   PLAYER_RADIUS,
   WORLD_HEIGHT,
@@ -86,7 +86,7 @@ export class MonsterSystem {
     monster.targetPlayerId = target.id;
 
     const targetDistance = distance(monster.x, monster.y, target.x, target.y);
-    if (targetDistance <= definition.combat.attackRange) {
+    if (targetDistance <= monster.attackRange) {
       monster.state = 'attack';
       this.tryAttack(monster, target, nowMs, world);
       return;
@@ -123,10 +123,9 @@ export class MonsterSystem {
     if (target.hp <= 0 || target.respawnAt > 0) return;
     if (nowMs < monster.nextAttackAt) return;
 
-    const definition = getMonsterDefinition(monster.type);
-    monster.nextAttackAt = nowMs + definition.combat.attackCooldownMs;
+    monster.nextAttackAt = nowMs + monster.attackCooldownMs;
 
-    const damage = definition.combat.attackDamage;
+    const damage = monster.attackDamage;
     target.hp = Math.max(0, target.hp - damage);
     world.pushEvent({
       type: 'combat_hit',
@@ -243,13 +242,16 @@ export class MonsterSystem {
     x: number,
     y: number,
     id = shortId('mob'),
-    spec: WorldMapPlacement['gameplay'] extends infer Gameplay ? Gameplay extends { kind: 'monsterSpawn'; spec?: infer Spec } ? Spec : never : never = undefined as never,
+    spec?: WorldMapMonsterSpecOverrides,
   ): MonsterEntity {
     const definition = getMonsterDefinition(type);
     const maxHp = normalizePositiveNumber(spec?.maxHp, definition.maxHp);
     const moveSpeed = normalizePositiveNumber(spec?.moveSpeed, definition.moveSpeed);
     const detectRange = normalizePositiveNumber(spec?.detectRange, definition.ai.detectRange);
     const loseRange = normalizePositiveNumber(spec?.loseRange, definition.ai.loseRange);
+    const attackRange = normalizePositiveNumber(spec?.attackRange, definition.combat.attackRange);
+    const attackDamage = normalizePositiveNumber(spec?.attackDamage, definition.combat.attackDamage);
+    const attackCooldownMs = normalizePositiveNumber(spec?.attackCooldownMs, definition.combat.attackCooldownMs);
 
     return {
       id,
@@ -263,6 +265,9 @@ export class MonsterSystem {
       speed: moveSpeed,
       detectRange,
       loseRange,
+      attackRange,
+      attackDamage,
+      attackCooldownMs,
       nextAttackAt: 0,
     };
   }
