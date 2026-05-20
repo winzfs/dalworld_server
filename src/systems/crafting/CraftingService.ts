@@ -1,4 +1,4 @@
-import { isInventoryItemId, type InventoryItemId } from '../inventory/ItemDefinitions';
+import { isInventoryItemId } from '../inventory/ItemDefinitions';
 import type { InventoryService } from '../inventory/InventoryService';
 import { getCraftingRecipe } from './CraftingRecipes';
 import type { CraftingRecipeDefinition } from './CraftingTypes';
