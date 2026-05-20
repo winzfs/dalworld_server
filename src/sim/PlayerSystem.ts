@@ -37,6 +37,7 @@ export function createPlayer(id: string): PlayerEntity {
     ],
     input: { up: false, down: false, left: false, right: false },
     nextGatherAt: 0,
+    nextAttackAt: 0,
   };
 }
 
