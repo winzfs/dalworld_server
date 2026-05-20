@@ -79,6 +79,7 @@ export type MonsterEntity = {
   attackCooldownMs: number;
   nextAttackAt: number;
   spawnRegionId?: string;
+  spawnRuleId?: string;
 };
 
 export type MonsterSpawnRegionEntity = {
@@ -91,6 +92,17 @@ export type MonsterSpawnRegionEntity = {
   radius: number;
   maxAlive: number;
   respawnMs: number;
+  spawnsPerHour: number;
+  nextSpawnAt: number;
+  spec?: WorldMapMonsterSpecOverrides;
+};
+
+export type MonsterSpawnRuleEntity = {
+  id: string;
+  monsterType: MonsterType;
+  scope: 'world' | 'region';
+  maxAlive: number;
+  spawnsPerHour: number;
   nextSpawnAt: number;
   spec?: WorldMapMonsterSpecOverrides;
 };
@@ -100,6 +112,7 @@ export class WorldState {
   readonly resources = new Map<string, ResourceEntity>();
   readonly monsters = new Map<string, MonsterEntity>();
   readonly monsterSpawnRegions = new Map<string, MonsterSpawnRegionEntity>();
+  readonly monsterSpawnRules = new Map<string, MonsterSpawnRuleEntity>();
   readonly events: ServerEvent[] = [];
   tick = 0;
   startedAt = Date.now();
