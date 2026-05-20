@@ -79,6 +79,15 @@ export const GAME_CONFIG = {
     >,
   },
 
+  combat: {
+    playerAttackRange: 92,
+    playerAttackDamage: 18,
+    playerAttackCooldownMs: 420,
+    monsterAttackRange: 42,
+    monsterAttackDamage: 8,
+    monsterAttackCooldownMs: 900,
+  },
+
   network: {
     rateLimitPerSecond: 120,
   },
