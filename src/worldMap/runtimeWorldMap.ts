@@ -16,7 +16,7 @@ export function getCellCollisionPlacements(
 ): WorldMapPlacement[] {
   const cell = getCell(map, cellX, cellY);
   if (!cell) return [];
-  return cell.placements.filter((placement) => placement.layer === 'collision');
+  return cell.placements.filter(isBlockingPlacement);
 }
 
 export function canCircleOccupyCell(
@@ -28,18 +28,7 @@ export function canCircleOccupyCell(
   radius: number,
 ): boolean {
   for (const placement of getCellCollisionPlacements(map, cellX, cellY)) {
-    const scale = Number.isFinite(placement.scale) ? Math.max(0.1, placement.scale) : 1;
-    const width = (placement.sourceRect?.width ?? 32) * scale;
-    const height = (placement.sourceRect?.height ?? 32) * scale;
-
-    if (
-      x + radius > placement.x &&
-      x - radius < placement.x + width &&
-      y + radius > placement.y &&
-      y - radius < placement.y + height
-    ) {
-      return false;
-    }
+    if (circleOverlapsPlacement(x, y, radius, placement)) return false;
   }
 
   return true;
@@ -52,7 +41,7 @@ export function getCollisionPlacements(map: GameWorldMap | null | undefined): Wo
 
   for (const cell of map.cells) {
     for (const placement of cell.placements) {
-      if (placement.layer !== 'collision') continue;
+      if (!isBlockingPlacement(placement)) continue;
       placements.push({
         ...placement,
         x: placement.x + cell.gridX * map.cellSize,
@@ -71,19 +60,27 @@ export function canCircleOccupyWorldMap(
   radius: number,
 ): boolean {
   for (const placement of getCollisionPlacements(map)) {
-    const scale = Number.isFinite(placement.scale) ? Math.max(0.1, placement.scale) : 1;
-    const width = (placement.sourceRect?.width ?? 32) * scale;
-    const height = (placement.sourceRect?.height ?? 32) * scale;
-
-    if (
-      x + radius > placement.x &&
-      x - radius < placement.x + width &&
-      y + radius > placement.y &&
-      y - radius < placement.y + height
-    ) {
-      return false;
-    }
+    if (circleOverlapsPlacement(x, y, radius, placement)) return false;
   }
 
   return true;
+}
+
+function isBlockingPlacement(placement: WorldMapPlacement): boolean {
+  if (placement.layer === 'collision') return true;
+  if (placement.gameplay?.kind === 'resource' && placement.gameplay.blocksMovement !== false) return true;
+  return false;
+}
+
+function circleOverlapsPlacement(x: number, y: number, radius: number, placement: WorldMapPlacement): boolean {
+  const scale = Number.isFinite(placement.scale) ? Math.max(0.1, placement.scale) : 1;
+  const width = (placement.displayWidth ?? placement.sourceRect?.width ?? 32) * scale;
+  const height = (placement.displayHeight ?? placement.sourceRect?.height ?? 32) * scale;
+
+  return (
+    x + radius > placement.x &&
+    x - radius < placement.x + width &&
+    y + radius > placement.y &&
+    y - radius < placement.y + height
+  );
 }
