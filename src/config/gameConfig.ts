@@ -1,4 +1,4 @@
-import type { ItemType, ResourceType } from '../protocol/messages';
+import type { ItemType, MonsterType, ResourceType } from '../protocol/messages';
 
 export const GAME_CONFIG = {
   world: {
@@ -15,6 +15,17 @@ export const GAME_CONFIG = {
     maxStamina: 100,
     staminaRegenPerSec: 12,
     respawnMs: 3_000,
+    progression: {
+      maxLevel: 50,
+      baseExpToNextLevel: 100,
+      expToNextLevelGrowth: 35,
+      maxHpPerLevel: 8,
+      maxStaminaPerLevel: 5,
+      monsterExp: {
+        wild_slime: 25,
+        sheep: 35,
+      } satisfies Record<MonsterType, number>,
+    },
   },
 
   resource: {
