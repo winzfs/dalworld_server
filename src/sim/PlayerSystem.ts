@@ -1,6 +1,7 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { Facing, MovementKeys } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
+import { getExpToNextLevel, getMaxHpForLevel, getMaxStaminaForLevel, sanitizeCharacterName } from '../systems/player/PlayerProgression';
 import { clamp, normalize } from '../utils/math';
 import {
   WORLD_HEIGHT,
@@ -17,17 +18,25 @@ export const STAMINA_REGEN_PER_SEC = GAME_CONFIG.player.staminaRegenPerSec;
 export const STARTER_BUILDING_WOOD = 200;
 export const STARTER_BUILDING_STONE = 120;
 
-export function createPlayer(id: string): PlayerEntity {
+export function createPlayer(id: string, characterName?: string): PlayerEntity {
+  const level = 1;
+  const maxHp = getMaxHpForLevel(level);
+  const maxStamina = getMaxStaminaForLevel(level);
+
   return {
     id,
+    characterName: sanitizeCharacterName(characterName),
+    level,
+    exp: 0,
+    expToNextLevel: getExpToNextLevel(level),
     x: WORLD_WIDTH / 2,
     y: WORLD_HEIGHT / 2,
     cellX: 0,
     cellY: 0,
-    hp: PLAYER_MAX_HP,
-    maxHp: PLAYER_MAX_HP,
-    stamina: PLAYER_MAX_STAMINA,
-    maxStamina: PLAYER_MAX_STAMINA,
+    hp: maxHp,
+    maxHp,
+    stamina: maxStamina,
+    maxStamina,
     facing: 'down',
     lastInputSeq: 0,
     inventory: { wood: STARTER_BUILDING_WOOD, stone: STARTER_BUILDING_STONE },
