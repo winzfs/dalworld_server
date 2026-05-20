@@ -176,7 +176,7 @@ export class MonsterSystem {
       getWorldMaxX(this.worldMap) - definition.collision.radius,
     );
 
-    if (this.canOccupy(monster, nextX, monster.y, world, buildingGrid)) {
+    if (this.canMoveTo(monster.type, nextX, monster.y, buildingGrid)) {
       monster.x = nextX;
     }
 
@@ -186,7 +186,7 @@ export class MonsterSystem {
       getWorldMaxY(this.worldMap) - definition.collision.radius,
     );
 
-    if (this.canOccupy(monster, monster.x, nextY, world, buildingGrid)) {
+    if (this.canMoveTo(monster.type, monster.x, nextY, buildingGrid)) {
       monster.y = nextY;
     }
   }
@@ -213,11 +213,7 @@ export class MonsterSystem {
     });
   }
 
-  private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
-    return this.canSpawnAt(monster.type, x, y, world, buildingGrid, monster.id);
-  }
-
-  private canSpawnAt(type: MonsterType, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid, ignoreMonsterId?: string): boolean {
+  private canMoveTo(type: MonsterType, x: number, y: number, buildingGrid?: BuildingGrid): boolean {
     const selfCircle = getCollisionCircle(type, x, y);
 
     if (!canCircleOccupyWorldMap(this.worldMap, selfCircle.x, selfCircle.y, selfCircle.radius)) {
@@ -228,6 +224,14 @@ export class MonsterSystem {
       return false;
     }
 
+    return true;
+  }
+
+  private canSpawnAt(type: MonsterType, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
+    const selfCircle = getCollisionCircle(type, x, y);
+
+    if (!this.canMoveTo(type, x, y, buildingGrid)) return false;
+
     for (const player of world.players.values()) {
       if (player.respawnAt > 0) continue;
       if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, player.x, player.y, PLAYER_RADIUS)) {
@@ -236,7 +240,6 @@ export class MonsterSystem {
     }
 
     for (const other of world.monsters.values()) {
-      if (other.id === ignoreMonsterId) continue;
       const otherCircle = getCollisionCircle(other.type, other.x, other.y);
       if (circlesOverlap(selfCircle.x, selfCircle.y, selfCircle.radius, otherCircle.x, otherCircle.y, otherCircle.radius)) {
         return false;
