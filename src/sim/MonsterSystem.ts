@@ -173,7 +173,7 @@ export class MonsterSystem {
     const nextX = clamp(
       monster.x + deltaX,
       definition.collision.radius,
-      WORLD_WIDTH - definition.collision.radius,
+      getWorldMaxX(this.worldMap) - definition.collision.radius,
     );
 
     if (this.canOccupy(monster, nextX, monster.y, world, buildingGrid)) {
@@ -183,7 +183,7 @@ export class MonsterSystem {
     const nextY = clamp(
       monster.y + deltaY,
       definition.collision.radius,
-      WORLD_HEIGHT - definition.collision.radius,
+      getWorldMaxY(this.worldMap) - definition.collision.radius,
     );
 
     if (this.canOccupy(monster, monster.x, nextY, world, buildingGrid)) {
@@ -279,14 +279,15 @@ export class MonsterSystem {
     const scale = normalizePositiveNumber(placement.scale, 1);
     const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
+    const cellSize = this.worldMap?.cellSize ?? WORLD_WIDTH;
 
     return {
       id: `map-spawn:${cellX}:${cellY}:${placement.id}`,
       cellX,
       cellY,
       monsterType: placement.gameplay.monsterType,
-      centerX: placement.x + cellX * (this.worldMap?.cellSize ?? WORLD_WIDTH) + (displayWidth * scale) / 2,
-      centerY: placement.y + cellY * (this.worldMap?.cellSize ?? WORLD_HEIGHT) + (displayHeight * scale) / 2,
+      centerX: placement.x + cellX * cellSize + (displayWidth * scale) / 2,
+      centerY: placement.y + cellY * cellSize + (displayHeight * scale) / 2,
       radius: spawnRadius,
       maxAlive,
       respawnMs,
@@ -362,8 +363,8 @@ export class MonsterSystem {
     return {
       id,
       type,
-      x: clamp(x, definition.collision.radius, WORLD_WIDTH - definition.collision.radius),
-      y: clamp(y, definition.collision.radius, WORLD_HEIGHT - definition.collision.radius),
+      x: clamp(x, definition.collision.radius, getWorldMaxX(this.worldMap) - definition.collision.radius),
+      y: clamp(y, definition.collision.radius, getWorldMaxY(this.worldMap) - definition.collision.radius),
       hp: maxHp,
       maxHp,
       state: 'idle',
@@ -409,6 +410,16 @@ function countRuleMonsters(world: WorldState, ruleId: string): number {
 
 function spawnIntervalMs(spawnsPerHour: number): number {
   return Math.max(1_000, Math.floor(3_600_000 / Math.max(1, spawnsPerHour)));
+}
+
+function getWorldMaxX(map: GameWorldMap | null): number {
+  if (!map || map.cells.length === 0) return WORLD_WIDTH;
+  return (Math.max(...map.cells.map((cell) => cell.gridX)) + 1) * map.cellSize;
+}
+
+function getWorldMaxY(map: GameWorldMap | null): number {
+  if (!map || map.cells.length === 0) return WORLD_HEIGHT;
+  return (Math.max(...map.cells.map((cell) => cell.gridY)) + 1) * map.cellSize;
 }
 
 function circlesOverlap(
