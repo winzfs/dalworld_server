@@ -9,6 +9,7 @@ import {
   WORLD_HEIGHT,
   WORLD_WIDTH,
   type MonsterEntity,
+  type MonsterSpawnRegionEntity,
   type PlayerEntity,
   type WorldState,
 } from './WorldState';
@@ -29,7 +30,7 @@ const START_AREA_SHEEP_COUNT = 3;
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
-    if (world.monsters.size > 0) return;
+    if (world.monsters.size > 0 || world.monsterSpawnRegions.size > 0) return;
 
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 2;
@@ -49,27 +50,51 @@ export class MonsterSystem {
   seedFromWorldMap(world: WorldState, map: GameWorldMap | null | undefined): void {
     if (!map) return;
 
-    const spawns: MonsterEntity[] = [];
+    const regions: MonsterSpawnRegionEntity[] = [];
 
     for (const cell of map.cells) {
       for (const placement of cell.placements) {
-        const spawn = this.createSpawnsFromPlacement(cell.gridX, cell.gridY, placement);
-        spawns.push(...spawn);
+        const region = this.createSpawnRegionFromPlacement(cell.gridX, cell.gridY, placement);
+        if (region) regions.push(region);
       }
     }
 
-    if (spawns.length === 0) return;
+    if (regions.length === 0) return;
 
+    const nowMs = Date.now();
     world.monsters.clear();
-    for (const monster of spawns) {
-      world.monsters.set(monster.id, monster);
+    world.monsterSpawnRegions.clear();
+
+    for (const region of regions) {
+      region.nextSpawnAt = nowMs + region.respawnMs;
+      world.monsterSpawnRegions.set(region.id, region);
+      for (let i = 0; i < region.maxAlive; i += 1) {
+        const monster = this.spawnFromRegion(region, i);
+        world.monsters.set(monster.id, monster);
+      }
     }
   }
 
   update(world: WorldState, dt: number, options: MonsterSystemUpdateOptions = {}): void {
     const nowMs = options.nowMs ?? Date.now();
+    this.updateSpawnRegions(world, nowMs);
+
     for (const monster of world.monsters.values()) {
       this.updateAi(monster, world, dt, nowMs, options.buildingGrid);
+    }
+  }
+
+  private updateSpawnRegions(world: WorldState, nowMs: number): void {
+    if (world.monsterSpawnRegions.size === 0) return;
+
+    for (const region of world.monsterSpawnRegions.values()) {
+      const aliveCount = countRegionMonsters(world, region.id);
+      if (aliveCount >= region.maxAlive) continue;
+      if (nowMs < region.nextSpawnAt) continue;
+
+      const monster = this.spawnFromRegion(region, nowMs);
+      world.monsters.set(monster.id, monster);
+      region.nextSpawnAt = nowMs + region.respawnMs;
     }
   }
 
@@ -200,33 +225,42 @@ export class MonsterSystem {
     return closest;
   }
 
-  private createSpawnsFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): MonsterEntity[] {
-    if (placement.gameplay?.kind !== 'monsterSpawn') return [];
+  private createSpawnRegionFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): MonsterSpawnRegionEntity | null {
+    if (placement.gameplay?.kind !== 'monsterSpawn') return null;
 
     const spawnRadius = normalizePositiveNumber(placement.gameplay.spawnRadius, 160);
     const maxAlive = Math.max(1, Math.min(50, Math.floor(normalizePositiveNumber(placement.gameplay.maxAlive, 1))));
+    const respawnMs = Math.max(1_000, Math.floor(normalizePositiveNumber(placement.gameplay.respawnMs, 30_000)));
     const scale = normalizePositiveNumber(placement.scale, 1);
     const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
-    const centerX = placement.x + (displayWidth * scale) / 2;
-    const centerY = placement.y + (displayHeight * scale) / 2;
-    const monsters: MonsterEntity[] = [];
 
-    for (let i = 0; i < maxAlive; i += 1) {
-      const angle = (Math.PI * 2 * i) / maxAlive;
-      const radius = maxAlive <= 1 ? 0 : spawnRadius * 0.65;
-      const x = centerX + Math.cos(angle) * radius;
-      const y = centerY + Math.sin(angle) * radius;
-      monsters.push(this.spawnAt(
-        placement.gameplay.monsterType,
-        x,
-        y,
-        `map-monster:${cellX}:${cellY}:${placement.id}:${i}`,
-        placement.gameplay.spec,
-      ));
-    }
+    return {
+      id: `map-spawn:${cellX}:${cellY}:${placement.id}`,
+      cellX,
+      cellY,
+      monsterType: placement.gameplay.monsterType,
+      centerX: placement.x + (displayWidth * scale) / 2,
+      centerY: placement.y + (displayHeight * scale) / 2,
+      radius: spawnRadius,
+      maxAlive,
+      respawnMs,
+      nextSpawnAt: 0,
+      spec: placement.gameplay.spec ? { ...placement.gameplay.spec } : undefined,
+    };
+  }
 
-    return monsters;
+  private spawnFromRegion(region: MonsterSpawnRegionEntity, seed: number): MonsterEntity {
+    const angle = (seed % 360) * (Math.PI / 180);
+    const radius = region.radius * (0.25 + ((seed % 100) / 100) * 0.55);
+    return this.spawnAt(
+      region.monsterType,
+      region.centerX + Math.cos(angle) * radius,
+      region.centerY + Math.sin(angle) * radius,
+      `map-monster:${region.id}:${seed}`,
+      region.spec,
+      region.id,
+    );
   }
 
   private spawn(type: MonsterType): MonsterEntity {
@@ -243,6 +277,7 @@ export class MonsterSystem {
     y: number,
     id = shortId('mob'),
     spec?: WorldMapMonsterSpecOverrides,
+    spawnRegionId?: string,
   ): MonsterEntity {
     const definition = getMonsterDefinition(type);
     const maxHp = normalizePositiveNumber(spec?.maxHp, definition.maxHp);
@@ -269,6 +304,7 @@ export class MonsterSystem {
       attackDamage,
       attackCooldownMs,
       nextAttackAt: 0,
+      spawnRegionId,
     };
   }
 }
@@ -281,6 +317,14 @@ function getCollisionCircle(type: MonsterType, x: number, y: number): CollisionC
     y: y + collision.offsetY,
     radius: collision.radius,
   };
+}
+
+function countRegionMonsters(world: WorldState, regionId: string): number {
+  let count = 0;
+  for (const monster of world.monsters.values()) {
+    if (monster.spawnRegionId === regionId) count += 1;
+  }
+  return count;
 }
 
 function circlesOverlap(
