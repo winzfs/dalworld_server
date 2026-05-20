@@ -1,4 +1,4 @@
-import { isInventoryItemId } from '../inventory/ItemDefinitions';
+import { isInventoryItemId, type InventoryItemId } from '../inventory/ItemDefinitions';
 import type { InventoryService } from '../inventory/InventoryService';
 import { getCraftingRecipe } from './CraftingRecipes';
 import type { CraftingRecipeDefinition } from './CraftingTypes';
@@ -25,6 +25,10 @@ export class CraftingService {
     const validation = this.validateRecipe(recipe);
     if (!validation.ok) return validation;
 
+    if (recipe.requiredStation && !this.inventory.hasAll(ownerId, [{ itemId: recipe.requiredStation, quantity: 1 }])) {
+      return { ok: false, reason: `필요한 제작도구가 없습니다: ${recipe.requiredStation}` };
+    }
+
     if (!this.inventory.hasAll(ownerId, recipe.inputs)) {
       return { ok: false, reason: '필요한 재료가 부족합니다.' };
     }
@@ -41,6 +45,10 @@ export class CraftingService {
   private validateRecipe(recipe: CraftingRecipeDefinition): { ok: true } | { ok: false; reason: string } {
     if (recipe.inputs.length === 0) return { ok: false, reason: '제작 입력 재료가 없습니다.' };
     if (recipe.outputs.length === 0) return { ok: false, reason: '제작 결과물이 없습니다.' };
+
+    if (recipe.requiredStation && !isInventoryItemId(recipe.requiredStation)) {
+      return { ok: false, reason: '제작 레시피에 알 수 없는 제작도구가 포함되어 있습니다.' };
+    }
 
     for (const stack of [...recipe.inputs, ...recipe.outputs]) {
       if (!isInventoryItemId(stack.itemId)) return { ok: false, reason: '제작 레시피에 알 수 없는 아이템이 포함되어 있습니다.' };
