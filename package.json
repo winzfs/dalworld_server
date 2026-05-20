@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "build": "tsc --noEmit",
+    "build": "npm run data:generate && tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run check:protocol && npm run build",
+    "check": "npm run data:generate && npm run typecheck && npm run check:protocol && npm run build",
     "check:protocol": "node scripts/check-protocol-sync.mjs",
+    "data:generate": "node scripts/generate-game-data.mjs",
     "db:migrate:local": "wrangler d1 migrations apply dalworld-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply dalworld-db --remote"
   },
