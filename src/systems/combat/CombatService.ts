@@ -112,7 +112,8 @@ export class CombatService {
     let snapshot: InventorySnapshot | undefined;
 
     for (const reward of definition.rewards) {
-      if (roll() > reward.chance) continue;
+      const chance = clamp01(reward.chance);
+      if (roll() > chance) continue;
       const addResult = store.add(reward.itemId, reward.quantity);
       if (!addResult.ok) continue;
 
@@ -171,4 +172,9 @@ function isInFront(player: PlayerEntity, monster: MonsterEntity): boolean {
   if (length <= 0.001) return true;
   const dot = (dx / length) * facing.x + (dy / length) * facing.y;
   return dot >= -0.2;
+}
+
+function clamp01(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
