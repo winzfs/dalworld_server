@@ -21,7 +21,7 @@ import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
-import type { GameWorldMap, WorldMapCell, WorldMapPlacement } from '../worldMap/types';
+import type { GameWorldMap, WorldMapCell, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
@@ -41,6 +41,7 @@ type WorldMapManifest = {
   tileSize: number;
   cellSize: number;
   cells: Array<{ gridX: number; gridY: number }>;
+  monsterSpawnRules?: WorldMapMonsterSpawnRule[];
 };
 
 type CompactWorldMapAsset = Omit<WorldMapPlacement, 'id' | 'x' | 'y' | 'layer' | 'scale'>;
@@ -182,6 +183,7 @@ export class GameRoom extends DurableObject<Env> {
         tileSize: manifest.tileSize,
         cellSize: manifest.cellSize,
         cells,
+        monsterSpawnRules: manifest.monsterSpawnRules,
       };
     }
 
@@ -199,6 +201,7 @@ export class GameRoom extends DurableObject<Env> {
       tileSize: map.tileSize,
       cellSize: map.cellSize,
       cells: map.cells.map((cell) => ({ gridX: cell.gridX, gridY: cell.gridY })),
+      monsterSpawnRules: map.monsterSpawnRules,
     };
 
     await this.ctx.storage.put(MAP_MANIFEST_STORAGE_KEY, manifest);
