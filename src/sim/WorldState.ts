@@ -74,6 +74,9 @@ export type MonsterEntity = {
   speed: number;
   detectRange: number;
   loseRange: number;
+  attackRange: number;
+  attackDamage: number;
+  attackCooldownMs: number;
   nextAttackAt: number;
 };
 
