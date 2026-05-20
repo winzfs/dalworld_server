@@ -164,6 +164,7 @@ export class GameRoom extends DurableObject<Env> {
   private setWorldMap(map: GameWorldMap | null): void {
     this.worldMap = map;
     this.simulation.resources.seedFromWorldMap(this.simulation.world, map);
+    this.simulation.monsters.seedFromWorldMap(this.simulation.world, map);
   }
 
   private async loadWorldMapFromStorage(): Promise<GameWorldMap | null> {
