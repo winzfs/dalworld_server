@@ -1,37 +1,39 @@
 import type { MonsterType } from '../../protocol/messages';
-import type { InventoryItemStack } from '../inventory/InventoryStore';
+import type { InventoryItemId } from '../inventory/InventoryStore';
 
-export type MonsterAiDefinition = {
+export type MonsterAiDefinition = Readonly<{
   detectRange: number;
   loseRange: number;
-};
+}>;
 
-export type MonsterCombatDefinition = {
+export type MonsterCombatDefinition = Readonly<{
   attackRange: number;
   attackDamage: number;
   attackCooldownMs: number;
-};
+}>;
 
-export type MonsterCollisionDefinition = {
+export type MonsterCollisionDefinition = Readonly<{
   radius: number;
   offsetX: number;
   offsetY: number;
-};
+}>;
 
-export type MonsterRewardDefinition = InventoryItemStack & {
+export type MonsterRewardDefinition = Readonly<{
+  itemId: InventoryItemId;
+  quantity: number;
   /** 0..1. MVP currently uses guaranteed drops, but the schema is ready for chance-based drops. */
   chance: number;
-};
+}>;
 
-export type MonsterDefinition = {
+export type MonsterDefinition = Readonly<{
   type: MonsterType;
   maxHp: number;
   moveSpeed: number;
   ai: MonsterAiDefinition;
   combat: MonsterCombatDefinition;
   collision: MonsterCollisionDefinition;
-  rewards: MonsterRewardDefinition[];
-};
+  rewards: readonly MonsterRewardDefinition[];
+}>;
 
 export const MONSTER_DEFINITIONS = {
   wild_slime: {
@@ -78,12 +80,12 @@ export const MONSTER_DEFINITIONS = {
       { itemId: 'fiber', quantity: 1, chance: 1 },
     ],
   },
-} satisfies Record<MonsterType, MonsterDefinition>;
+} as const satisfies Readonly<Record<MonsterType, MonsterDefinition>>;
 
 export function getMonsterDefinition(type: MonsterType): MonsterDefinition {
   return MONSTER_DEFINITIONS[type] ?? MONSTER_DEFINITIONS.wild_slime;
 }
 
-export function getMonsterDefinitions(): Record<MonsterType, MonsterDefinition> {
+export function getMonsterDefinitions(): Readonly<Record<MonsterType, MonsterDefinition>> {
   return MONSTER_DEFINITIONS;
 }
