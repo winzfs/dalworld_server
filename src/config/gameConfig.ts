@@ -14,6 +14,7 @@ export const GAME_CONFIG = {
     maxHp: 100,
     maxStamina: 100,
     staminaRegenPerSec: 12,
+    respawnMs: 3_000,
   },
 
   resource: {
