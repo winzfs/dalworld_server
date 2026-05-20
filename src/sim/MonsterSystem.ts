@@ -172,7 +172,7 @@ export class MonsterSystem {
 
     const nextX = clamp(
       monster.x + deltaX,
-      definition.collision.radius,
+      getWorldMinX(this.worldMap) + definition.collision.radius,
       getWorldMaxX(this.worldMap) - definition.collision.radius,
     );
 
@@ -182,7 +182,7 @@ export class MonsterSystem {
 
     const nextY = clamp(
       monster.y + deltaY,
-      definition.collision.radius,
+      getWorldMinY(this.worldMap) + definition.collision.radius,
       getWorldMaxY(this.worldMap) - definition.collision.radius,
     );
 
@@ -363,8 +363,8 @@ export class MonsterSystem {
     return {
       id,
       type,
-      x: clamp(x, definition.collision.radius, getWorldMaxX(this.worldMap) - definition.collision.radius),
-      y: clamp(y, definition.collision.radius, getWorldMaxY(this.worldMap) - definition.collision.radius),
+      x: clamp(x, getWorldMinX(this.worldMap) + definition.collision.radius, getWorldMaxX(this.worldMap) - definition.collision.radius),
+      y: clamp(y, getWorldMinY(this.worldMap) + definition.collision.radius, getWorldMaxY(this.worldMap) - definition.collision.radius),
       hp: maxHp,
       maxHp,
       state: 'idle',
@@ -410,6 +410,16 @@ function countRuleMonsters(world: WorldState, ruleId: string): number {
 
 function spawnIntervalMs(spawnsPerHour: number): number {
   return Math.max(1_000, Math.floor(3_600_000 / Math.max(1, spawnsPerHour)));
+}
+
+function getWorldMinX(map: GameWorldMap | null): number {
+  if (!map || map.cells.length === 0) return 0;
+  return Math.min(...map.cells.map((cell) => cell.gridX)) * map.cellSize;
+}
+
+function getWorldMinY(map: GameWorldMap | null): number {
+  if (!map || map.cells.length === 0) return 0;
+  return Math.min(...map.cells.map((cell) => cell.gridY)) * map.cellSize;
 }
 
 function getWorldMaxX(map: GameWorldMap | null): number {
