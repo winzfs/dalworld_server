@@ -38,6 +38,8 @@ export type PlayerEntity = {
   nextGatherAt: number;
   /** epoch ms when next player attack is allowed */
   nextAttackAt: number;
+  /** epoch ms when respawn is allowed. 0 means alive. */
+  respawnAt: number;
 };
 
 export type ResourceEntity = {
@@ -109,6 +111,8 @@ export class WorldState {
       lastInputSeq: p.lastInputSeq,
       inventory: { ...p.inventory },
       inventoryItems: p.inventoryItems.map((item) => ({ ...item })),
+      alive: p.respawnAt === 0,
+      respawnAt: p.respawnAt,
     }));
   }
 }
