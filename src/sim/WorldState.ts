@@ -10,7 +10,7 @@ import type {
   ServerEvent,
 } from '../protocol/messages';
 import type { InventoryItemStack } from '../systems/inventory/InventoryStore';
-import type { WorldMapSourceRect } from '../worldMap/types';
+import type { WorldMapMonsterSpecOverrides, WorldMapSourceRect } from '../worldMap/types';
 
 export const WORLD_WIDTH = GAME_CONFIG.world.width;
 export const WORLD_HEIGHT = GAME_CONFIG.world.height;
@@ -78,12 +78,28 @@ export type MonsterEntity = {
   attackDamage: number;
   attackCooldownMs: number;
   nextAttackAt: number;
+  spawnRegionId?: string;
+};
+
+export type MonsterSpawnRegionEntity = {
+  id: string;
+  cellX: number;
+  cellY: number;
+  monsterType: MonsterType;
+  centerX: number;
+  centerY: number;
+  radius: number;
+  maxAlive: number;
+  respawnMs: number;
+  nextSpawnAt: number;
+  spec?: WorldMapMonsterSpecOverrides;
 };
 
 export class WorldState {
   readonly players = new Map<string, PlayerEntity>();
   readonly resources = new Map<string, ResourceEntity>();
   readonly monsters = new Map<string, MonsterEntity>();
+  readonly monsterSpawnRegions = new Map<string, MonsterSpawnRegionEntity>();
   readonly events: ServerEvent[] = [];
   tick = 0;
   startedAt = Date.now();
