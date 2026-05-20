@@ -1,22 +1,19 @@
 import { GAME_CONFIG } from '../../config/gameConfig';
-import type { CombatAttackRequest, CombatServerEvent, Facing, MonsterType } from '../../protocol/messages';
+import type { CombatAttackRequest, CombatServerEvent, Facing } from '../../protocol/messages';
 import type { MonsterEntity, PlayerEntity, WorldState } from '../../sim/WorldState';
 import { distance } from '../../utils/math';
 import type { InventorySnapshot, InventoryStore } from '../inventory/InventoryStore';
+import { getMonsterDefinition } from '../monster/MonsterDefinitions';
 
 type CombatServiceOptions = {
   now: () => number;
   getInventory: (playerId: string, player: PlayerEntity) => InventoryStore;
+  roll?: () => number;
 };
 
 type CombatResult = {
   events: CombatServerEvent[];
   inventorySnapshot?: InventorySnapshot;
-};
-
-type MonsterReward = {
-  itemId: Parameters<InventoryStore['add']>[0];
-  amount: number;
 };
 
 const FACING_VECTOR: Record<Facing, { x: number; y: number }> = {
@@ -33,7 +30,7 @@ export class CombatService {
     const now = this.options.now();
     const player = world.players.get(playerId);
     if (!player) return rejected(request.requestId, '플레이어를 찾을 수 없습니다.');
-    if (player.hp <= 0) return rejected(request.requestId, '행동할 수 없는 상태입니다.');
+    if (player.hp <= 0 || player.respawnAt > 0) return rejected(request.requestId, '행동할 수 없는 상태입니다.');
     if (now < player.nextAttackAt) return rejected(request.requestId, '공격 재사용 대기 중입니다.');
 
     if (!isFacing(request.facing)) {
@@ -93,25 +90,44 @@ export class CombatService {
         y: target.y,
       });
 
-      const reward = getMonsterReward(target.type);
-      if (reward) {
-        const store = this.options.getInventory(playerId, player);
-        const addResult = store.add(reward.itemId, reward.amount);
-        if (addResult.ok) {
-          events.push({
-            type: 'COMBAT_REWARD_GRANTED',
-            requestId: request.requestId,
-            playerId,
-            monsterId: target.id,
-            itemId: reward.itemId,
-            amount: reward.amount,
-          });
-          return { events, inventorySnapshot: addResult.snapshot };
-        }
+      const rewardSnapshot = this.grantRewards(playerId, player, target, request.requestId, events);
+      if (rewardSnapshot) {
+        return { events, inventorySnapshot: rewardSnapshot };
       }
     }
 
     return { events };
+  }
+
+  private grantRewards(
+    playerId: string,
+    player: PlayerEntity,
+    target: MonsterEntity,
+    requestId: string,
+    events: CombatServerEvent[],
+  ): InventorySnapshot | undefined {
+    const definition = getMonsterDefinition(target.type);
+    const store = this.options.getInventory(playerId, player);
+    const roll = this.options.roll ?? Math.random;
+    let snapshot: InventorySnapshot | undefined;
+
+    for (const reward of definition.rewards) {
+      if (roll() > reward.chance) continue;
+      const addResult = store.add(reward.itemId, reward.quantity);
+      if (!addResult.ok) continue;
+
+      snapshot = addResult.snapshot;
+      events.push({
+        type: 'COMBAT_REWARD_GRANTED',
+        requestId,
+        playerId,
+        monsterId: target.id,
+        itemId: reward.itemId,
+        amount: reward.quantity,
+      });
+    }
+
+    return snapshot;
   }
 
   private findTarget(world: WorldState, player: PlayerEntity, request: CombatAttackRequest): MonsterEntity | null {
@@ -155,10 +171,4 @@ function isInFront(player: PlayerEntity, monster: MonsterEntity): boolean {
   if (length <= 0.001) return true;
   const dot = (dx / length) * facing.x + (dy / length) * facing.y;
   return dot >= -0.2;
-}
-
-function getMonsterReward(type: MonsterType): MonsterReward | null {
-  if (type === 'sheep') return { itemId: 'fiber', amount: 1 };
-  if (type === 'wild_slime') return { itemId: 'stone', amount: 1 };
-  return null;
 }
