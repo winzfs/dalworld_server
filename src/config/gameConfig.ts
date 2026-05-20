@@ -1,4 +1,4 @@
-import type { ItemType, MonsterType, ResourceType } from '../protocol/messages';
+import type { ItemType, ResourceType } from '../protocol/messages';
 
 export const GAME_CONFIG = {
   world: {
@@ -53,40 +53,12 @@ export const GAME_CONFIG = {
 
   monster: {
     startingMonsters: 8,
-    templates: {
-      wild_slime: {
-        type: 'wild_slime',
-        hp: 50,
-        speed: 80,
-        detectRange: 250,
-        loseRange: 450,
-      },
-      sheep: {
-        type: 'sheep',
-        hp: 35,
-        speed: 65,
-        detectRange: 180,
-        loseRange: 320,
-      },
-    } satisfies Record<
-      MonsterType,
-      {
-        type: MonsterType;
-        hp: number;
-        speed: number;
-        detectRange: number;
-        loseRange: number;
-      }
-    >,
   },
 
   combat: {
     playerAttackRange: 92,
     playerAttackDamage: 18,
     playerAttackCooldownMs: 420,
-    monsterAttackRange: 42,
-    monsterAttackDamage: 8,
-    monsterAttackCooldownMs: 900,
   },
 
   network: {
