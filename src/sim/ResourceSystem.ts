@@ -1,7 +1,7 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
 import { shortId } from '../utils/ids';
-import { distance, randomRange } from '../utils/math';
+import { randomRange } from '../utils/math';
 import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
 import {
   WORLD_HEIGHT,
@@ -22,6 +22,13 @@ type ResourceTemplate = {
   drop: ItemType;
   dropAmount: number;
   respawnMs: number;
+};
+
+type InteractionArea = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
 };
 
 const TEMPLATES: Record<ResourceType, ResourceTemplate> = GAME_CONFIG.resource.templates;
@@ -85,34 +92,20 @@ export class ResourceSystem {
     let resource: ResourceEntity | undefined;
     if (resourceId) {
       const candidate = world.resources.get(resourceId);
-      if (
-        candidate &&
-        candidate.cellX === player.cellX &&
-        candidate.cellY === player.cellY &&
-        candidate.respawnAt === 0 &&
-        candidate.hp > 0
-      ) {
+      if (candidate && isGatherableInCurrentCell(candidate, player) && canInteractWithResource(player, candidate)) {
         resource = candidate;
       }
     }
+
     if (!resource) {
-      let nearestDist = GATHER_RANGE;
-      for (const r of world.resources.values()) {
-        if (r.cellX !== player.cellX || r.cellY !== player.cellY) continue;
-        if (r.respawnAt !== 0 || r.hp <= 0) continue;
-        const d = distance(player.x, player.y, r.x, r.y);
-        if (d < nearestDist) {
-          nearestDist = d;
-          resource = r;
-        }
-      }
+      resource = findNearestInteractableResource(world, player);
     }
 
     if (!resource) {
       return { ok: false, reason: 'unavailable' };
     }
 
-    if (distance(player.x, player.y, resource.x, resource.y) > GATHER_RANGE) {
+    if (!canInteractWithResource(player, resource)) {
       return { ok: false, reason: 'out_of_range' };
     }
 
@@ -160,6 +153,7 @@ export class ResourceSystem {
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
     const scaledWidth = displayWidth * scale;
     const scaledHeight = displayHeight * scale;
+    const interactionPoint = getResourceInteractionPoint(type, placement.x, placement.y, scaledWidth, scaledHeight);
 
     return {
       id: `map-resource:${cellX}:${cellY}:${placement.id}`,
@@ -171,8 +165,8 @@ export class ResourceSystem {
       displayWidth,
       displayHeight,
       sourceRect: placement.sourceRect ? { ...placement.sourceRect } : undefined,
-      x: placement.x + scaledWidth / 2,
-      y: placement.y + scaledHeight / 2,
+      x: interactionPoint.x,
+      y: interactionPoint.y,
       hp: maxHp,
       maxHp,
       respawnAt: 0,
@@ -196,6 +190,97 @@ export class ResourceSystem {
   }
 }
 
+function isGatherableInCurrentCell(resource: ResourceEntity, player: PlayerEntity): boolean {
+  return (
+    resource.cellX === player.cellX &&
+    resource.cellY === player.cellY &&
+    resource.respawnAt === 0 &&
+    resource.hp > 0
+  );
+}
+
+function findNearestInteractableResource(world: WorldState, player: PlayerEntity): ResourceEntity | undefined {
+  let nearest: ResourceEntity | undefined;
+  let bestScore = Number.POSITIVE_INFINITY;
+
+  for (const resource of world.resources.values()) {
+    if (!isGatherableInCurrentCell(resource, player)) continue;
+
+    const distanceToArea = getDistanceToInteractionArea(player, resource);
+    const allowedRange = getGatherRangeForResource(resource.type);
+    if (distanceToArea > allowedRange) continue;
+
+    const score = distanceToArea / allowedRange;
+    if (score < bestScore) {
+      bestScore = score;
+      nearest = resource;
+    }
+  }
+
+  return nearest;
+}
+
+function canInteractWithResource(player: PlayerEntity, resource: ResourceEntity): boolean {
+  return getDistanceToInteractionArea(player, resource) <= getGatherRangeForResource(resource.type);
+}
+
+function getDistanceToInteractionArea(player: PlayerEntity, resource: ResourceEntity): number {
+  const area = getResourceInteractionArea(resource);
+  const closestX = clamp(player.x, area.left, area.right);
+  const closestY = clamp(player.y, area.top, area.bottom);
+  return Math.hypot(player.x - closestX, player.y - closestY);
+}
+
+function getResourceInteractionArea(resource: ResourceEntity): InteractionArea {
+  const scale = normalizePositiveNumber(resource.assetScale, 1);
+  const width = normalizePositiveNumber(resource.displayWidth ?? resource.sourceRect?.width, 32) * scale;
+  const height = normalizePositiveNumber(resource.displayHeight ?? resource.sourceRect?.height, 32) * scale;
+
+  if (resource.type === 'tree') {
+    const trunkWidth = clamp(width * 0.42, 28, 96);
+    const trunkHeight = clamp(height * 0.42, 36, 128);
+    return {
+      left: resource.x - trunkWidth / 2,
+      right: resource.x + trunkWidth / 2,
+      top: resource.y - trunkHeight * 0.78,
+      bottom: resource.y + trunkHeight * 0.24,
+    };
+  }
+
+  const radiusX = clamp(width * 0.5, 20, 80);
+  const radiusY = clamp(height * 0.5, 20, 80);
+  return {
+    left: resource.x - radiusX,
+    right: resource.x + radiusX,
+    top: resource.y - radiusY,
+    bottom: resource.y + radiusY,
+  };
+}
+
+function getResourceInteractionPoint(
+  type: ResourceType,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): { x: number; y: number } {
+  if (type === 'tree') {
+    return {
+      x: x + width * 0.5,
+      y: y + height * 0.82,
+    };
+  }
+
+  return {
+    x: x + width * 0.5,
+    y: y + height * 0.5,
+  };
+}
+
+function getGatherRangeForResource(type: ResourceType): number {
+  return type === 'tree' ? GATHER_RANGE + 28 : GATHER_RANGE;
+}
+
 function getPlacementResourceType(placement: WorldMapPlacement): ResourceType | null {
   if (placement.gameplay?.kind === 'resource') {
     return placement.gameplay.resourceType;
@@ -205,6 +290,7 @@ function getPlacementResourceType(placement: WorldMapPlacement): ResourceType | 
 
   const filename = getFilename(placement.assetUrl).toLowerCase();
   if (filename.startsWith('rock')) return 'stone';
+  if (filename.startsWith('stone')) return 'stone';
   if (filename.startsWith('tree')) return 'tree';
   return null;
 }
@@ -224,4 +310,8 @@ function randomPosition(): { x: number; y: number } {
 
 function normalizePositiveNumber(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) && (value as number) > 0 ? (value as number) : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
