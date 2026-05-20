@@ -1,6 +1,6 @@
 # DalWorld Server Current System Status
 
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 이 문서는 현재 서버 구현 상태를 빠르게 파악하기 위한 기준 문서다.
 AI 작업자는 기능 추가나 수정 전에 이 문서를 확인하고, 실제 코드와 차이가 있으면 문서를 함께 갱신한다.
@@ -41,7 +41,13 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 - 건설물 충돌 검증
 - 자원 채집 처리
 - 자원 리스폰
-- 몬스터 idle/chase AI
+- 몬스터 idle/chase/attack AI
+- 몬스터별 서버 권위 스펙 정의: `src/systems/monster/MonsterDefinitions.ts`
+- 몬스터별 HP/이동속도/감지범위/추적해제범위/공격력/공격속도/공격범위/충돌/드롭 보상
+- 플레이어 기본 공격 요청 처리
+- 몬스터 피격/사망/보상 지급
+- 몬스터 공격에 의한 플레이어 데미지
+- 플레이어 사망/리스폰
 - 제작 요청 처리
 - 인벤토리 snapshot 처리
 - 건설 배치 요청 처리
@@ -61,6 +67,9 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 
 다음 기능은 연결되어 있으나 추가 검증이 필요하다.
 
+- 전투 타입체크/빌드 검증
+- 전투 밸런스 검증
+- 몬스터 리스폰/스폰 테이블 확장
 - Durable Object 재시작 후 건설 상태 복구
 - 대형 월드맵 로드 성능
 - 건설물 저장 실패 시 복구 전략
@@ -74,11 +83,9 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 
 ## 4. 미구현 또는 향후 구현
 
-- 본격 전투 시스템
-- 몬스터 공격
-- 플레이어 데미지
-- 사망/리스폰
 - 장비 시스템
+- 스킬/상태이상 시스템
+- 몬스터 드롭 확률/희귀 보상 고도화
 - 계정/인증
 - D1 기반 플레이어 영속 데이터
 - 멀티 룸
@@ -98,6 +105,9 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 - Durable Object room: `src/rooms/GameRoom.ts`
 - simulation: `src/sim/*`
 - player system: `src/sim/PlayerSystem.ts`
+- monster system: `src/sim/MonsterSystem.ts`
+- monster definitions: `src/systems/monster/MonsterDefinitions.ts`
+- combat system: `src/systems/combat/CombatService.ts`
 - world state: `src/sim/WorldState.ts`
 - building system: `src/systems/building/*`
 - inventory system: `src/systems/inventory/*`
@@ -109,8 +119,14 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 
 ### GameRoom 책임 증가
 
-`GameRoom.ts`는 현재 WebSocket, 메시지 라우팅, 맵 저장, 건설 저장, 제작 처리, 낮/밤 토글, tick loop를 모두 연결한다.
+`GameRoom.ts`는 현재 WebSocket, 메시지 라우팅, 맵 저장, 건설 저장, 제작 처리, 낮/밤 토글, 전투 요청 처리, tick loop를 모두 연결한다.
 새 기능을 추가할 때는 가능한 한 별도 서비스로 분리한다.
+
+### 몬스터 서버 권위 스펙
+
+몬스터의 게임 판정용 스펙은 `src/systems/monster/MonsterDefinitions.ts`에서 관리한다.
+HP, 이동속도, AI 거리, 공격력, 공격속도, 공격범위, 충돌, 드롭 보상은 이 파일을 기준으로 한다.
+클라이언트의 `assets/monsters.ts`는 스프라이트/애니메이션/fallback 색상 같은 표현 전용 데이터만 관리한다.
 
 ### 서버 권위 유지
 
@@ -129,11 +145,11 @@ Node.js 전용 API를 사용하지 않는다.
 
 ## 8. 다음 우선순위 제안
 
-1. README와 현재 코드 상태 동기화
+1. 타입체크/빌드 오류 수정
 2. GameRoom 책임 분리
-3. 건설 저장/복구 테스트 강화
-4. 제작/인벤토리 영속화 설계
-5. 전투 시스템 설계 및 구현
+3. 전투 밸런스 조정
+4. 몬스터 스폰/리스폰 테이블 설계
+5. 제작/인벤토리 영속화 설계
 6. D1 기반 플레이어 저장 구조 설계
 7. 멀티 룸 구조 설계
 
