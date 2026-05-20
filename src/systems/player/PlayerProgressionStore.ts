@@ -56,8 +56,6 @@ export class PlayerProgressionStore {
   }
 
   async save(player: PlayerEntity, nowMs = Date.now()): Promise<void> {
-    const existing = await this.load(player.id);
-    const createdAt = existing?.created_at ?? nowMs;
     const inventoryJson = JSON.stringify(player.inventoryItems);
 
     await this.db
@@ -99,7 +97,7 @@ export class PlayerProgressionStore {
         player.hp,
         player.stamina,
         inventoryJson,
-        createdAt,
+        nowMs,
         nowMs,
       )
       .run();
