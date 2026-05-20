@@ -141,7 +141,7 @@ export class CombatService {
     for (const monster of world.monsters.values()) {
       if (!this.canHit(player, monster)) continue;
       const d = distance(player.x, player.y, monster.x, monster.y);
-      if (d <= bestDistance && isInFront(player, monster)) {
+      if (d <= bestDistance + getMonsterHitRadius(monster) && isInFront(player, monster)) {
         best = monster;
         bestDistance = d;
       }
@@ -152,7 +152,7 @@ export class CombatService {
 
   private canHit(player: PlayerEntity, monster: MonsterEntity): boolean {
     if (monster.hp <= 0) return false;
-    return distance(player.x, player.y, monster.x, monster.y) <= GAME_CONFIG.combat.playerAttackRange;
+    return distance(player.x, player.y, monster.x, monster.y) <= GAME_CONFIG.combat.playerAttackRange + getMonsterHitRadius(monster);
   }
 }
 
@@ -171,7 +171,11 @@ function isInFront(player: PlayerEntity, monster: MonsterEntity): boolean {
   const length = Math.hypot(dx, dy);
   if (length <= 0.001) return true;
   const dot = (dx / length) * facing.x + (dy / length) * facing.y;
-  return dot >= -0.2;
+  return dot >= -0.35;
+}
+
+function getMonsterHitRadius(monster: MonsterEntity): number {
+  return getMonsterDefinition(monster.type).collision.radius;
 }
 
 function clamp01(value: number): number {
