@@ -1,12 +1,15 @@
 # dalworld-server
 
+> AI 작업자와 개발자는 코드 수정 전에 반드시 [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md)를 먼저 읽는다.
+
 Cloudflare Workers + Durable Objects + D1 SQLite 기반 서버 권위 2D 멀티플레이 생존/건설 게임 서버.
 
 서버는 실제 게임 판정과 월드 상태 확정을 담당한다. 클라이언트가 보낸 입력과 요청은 의도로만 취급하고, 서버가 검증한 뒤 상태를 변경한다.
 
 ## 작업 전 필수 문서
 
-AI 또는 개발자는 코드 수정 전에 아래 문서를 먼저 확인한다.
+1. 먼저 [`docs/AI_WORKFLOW.md`](docs/AI_WORKFLOW.md)를 읽는다.
+2. 작업 범위에 따라 아래 문서를 추가로 확인한다.
 
 | 문서 | 목적 |
 |------|------|
