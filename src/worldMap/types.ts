@@ -14,6 +14,16 @@ export type WorldMapMonsterSpecOverrides = {
   attackCooldownMs?: number;
 };
 
+export type WorldMapMonsterSpawnRule = {
+  id: string;
+  enabled: boolean;
+  monsterType: MonsterType;
+  scope: 'world' | 'region';
+  maxAlive: number;
+  spawnsPerHour: number;
+  spec?: WorldMapMonsterSpecOverrides;
+};
+
 export type WorldMapPlacementGameplay =
   | {
       kind: 'resource';
@@ -28,6 +38,7 @@ export type WorldMapPlacementGameplay =
       spawnRadius: number;
       maxAlive: number;
       respawnMs: number;
+      spawnsPerHour?: number;
       spec?: WorldMapMonsterSpecOverrides;
     };
 
@@ -67,4 +78,5 @@ export type GameWorldMap = {
   tileSize: number;
   cellSize: number;
   cells: WorldMapCell[];
+  monsterSpawnRules?: WorldMapMonsterSpawnRule[];
 };
