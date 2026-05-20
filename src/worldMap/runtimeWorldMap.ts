@@ -34,33 +34,31 @@ export function canCircleOccupyCell(
   return true;
 }
 
-export function getCollisionPlacements(map: GameWorldMap | null | undefined): WorldMapPlacement[] {
-  if (!map) return [];
-
-  const placements: WorldMapPlacement[] = [];
-
-  for (const cell of map.cells) {
-    for (const placement of cell.placements) {
-      if (!isBlockingPlacement(placement)) continue;
-      placements.push({
-        ...placement,
-        x: placement.x + cell.gridX * map.cellSize,
-        y: placement.y + cell.gridY * map.cellSize,
-      });
-    }
-  }
-
-  return placements;
-}
-
 export function canCircleOccupyWorldMap(
   map: GameWorldMap | null | undefined,
   x: number,
   y: number,
   radius: number,
 ): boolean {
-  for (const placement of getCollisionPlacements(map)) {
-    if (circleOverlapsPlacement(x, y, radius, placement)) return false;
+  if (!map) return true;
+
+  const minCellX = Math.floor((x - radius) / map.cellSize);
+  const maxCellX = Math.floor((x + radius) / map.cellSize);
+  const minCellY = Math.floor((y - radius) / map.cellSize);
+  const maxCellY = Math.floor((y + radius) / map.cellSize);
+
+  for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      const cell = getCell(map, cellX, cellY);
+      if (!cell) continue;
+
+      const offsetX = cell.gridX * map.cellSize;
+      const offsetY = cell.gridY * map.cellSize;
+      for (const placement of cell.placements) {
+        if (!isBlockingPlacement(placement)) continue;
+        if (circleOverlapsPlacement(x, y, radius, placement, offsetX, offsetY)) return false;
+      }
+    }
   }
 
   return true;
@@ -72,15 +70,24 @@ function isBlockingPlacement(placement: WorldMapPlacement): boolean {
   return false;
 }
 
-function circleOverlapsPlacement(x: number, y: number, radius: number, placement: WorldMapPlacement): boolean {
+function circleOverlapsPlacement(
+  x: number,
+  y: number,
+  radius: number,
+  placement: WorldMapPlacement,
+  offsetX = 0,
+  offsetY = 0,
+): boolean {
   const scale = Number.isFinite(placement.scale) ? Math.max(0.1, placement.scale) : 1;
   const width = (placement.displayWidth ?? placement.sourceRect?.width ?? 32) * scale;
   const height = (placement.displayHeight ?? placement.sourceRect?.height ?? 32) * scale;
+  const px = placement.x + offsetX;
+  const py = placement.y + offsetY;
 
   return (
-    x + radius > placement.x &&
-    x - radius < placement.x + width &&
-    y + radius > placement.y &&
-    y - radius < placement.y + height
+    x + radius > px &&
+    x - radius < px + width &&
+    y + radius > py &&
+    y - radius < py + height
   );
 }
