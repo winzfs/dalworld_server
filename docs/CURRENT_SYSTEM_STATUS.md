@@ -39,6 +39,9 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 - 서버 위치 검증
 - 월드맵 충돌 검증
 - 건설물 충돌 검증
+- 플레이어 캐릭터 이름/레벨/경험치/HP/스태미나 snapshot
+- 레벨 기반 최대 HP/최대 스태미나 계산
+- 몬스터 처치 경험치 지급과 레벨업 이벤트
 - 자원 채집 처리
 - 자원 리스폰
 - 몬스터 idle/chase/attack AI
@@ -69,6 +72,8 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 
 - 전투 타입체크/빌드 검증
 - 전투 밸런스 검증
+- 레벨/경험치 밸런스 검증
+- 플레이어 진행도 영속화
 - 몬스터 리스폰/스폰 테이블 확장
 - Durable Object 재시작 후 건설 상태 복구
 - 대형 월드맵 로드 성능
@@ -105,6 +110,7 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 - Durable Object room: `src/rooms/GameRoom.ts`
 - simulation: `src/sim/*`
 - player system: `src/sim/PlayerSystem.ts`
+- player progression: `src/systems/player/PlayerProgression.ts`
 - monster system: `src/sim/MonsterSystem.ts`
 - monster definitions: `src/systems/monster/MonsterDefinitions.ts`
 - combat system: `src/systems/combat/CombatService.ts`
@@ -128,6 +134,12 @@ DalWorld 서버는 Cloudflare Workers + Durable Objects + TypeScript 기반의 2
 HP, 이동속도, AI 거리, 공격력, 공격속도, 공격범위, 충돌, 드롭 보상은 이 파일을 기준으로 한다.
 클라이언트의 `assets/monsters.ts`는 스프라이트/애니메이션/fallback 색상 같은 표현 전용 데이터만 관리한다.
 
+### 플레이어 진행도 서버 권위
+
+캐릭터 이름 정규화, 레벨, 경험치, 레벨업, 최대 HP/스태미나 계산은 서버에서 처리한다.
+클라이언트는 snapshot/event를 표시만 한다.
+현재 진행도는 세션 메모리 상태이며 D1 영속화는 향후 작업이다.
+
 ### 서버 권위 유지
 
 모든 중요한 게임 판정은 서버에서 확정한다.
@@ -147,9 +159,9 @@ Node.js 전용 API를 사용하지 않는다.
 
 1. 타입체크/빌드 오류 수정
 2. GameRoom 책임 분리
-3. 전투 밸런스 조정
+3. 전투/레벨 밸런스 조정
 4. 몬스터 스폰/리스폰 테이블 설계
-5. 제작/인벤토리 영속화 설계
+5. 제작/인벤토리/플레이어 진행도 영속화 설계
 6. D1 기반 플레이어 저장 구조 설계
 7. 멀티 룸 구조 설계
 
