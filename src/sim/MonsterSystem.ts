@@ -3,6 +3,7 @@ import type { MonsterType } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
+import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
 import {
   PLAYER_RADIUS,
   WORLD_HEIGHT,
@@ -28,6 +29,8 @@ const START_AREA_SHEEP_COUNT = 3;
 
 export class MonsterSystem {
   seed(world: WorldState, count: number): void {
+    if (world.monsters.size > 0) return;
+
     const centerX = WORLD_WIDTH / 2;
     const centerY = WORLD_HEIGHT / 2;
 
@@ -39,6 +42,26 @@ export class MonsterSystem {
     for (let i = START_AREA_SHEEP_COUNT; i < count; i++) {
       const type = SPAWN_TYPES[i % SPAWN_TYPES.length];
       const monster = this.spawn(type);
+      world.monsters.set(monster.id, monster);
+    }
+  }
+
+  seedFromWorldMap(world: WorldState, map: GameWorldMap | null | undefined): void {
+    if (!map) return;
+
+    const spawns: MonsterEntity[] = [];
+
+    for (const cell of map.cells) {
+      for (const placement of cell.placements) {
+        const spawn = this.createSpawnsFromPlacement(cell.gridX, cell.gridY, placement);
+        spawns.push(...spawn);
+      }
+    }
+
+    if (spawns.length === 0) return;
+
+    world.monsters.clear();
+    for (const monster of spawns) {
       world.monsters.set(monster.id, monster);
     }
   }
@@ -178,6 +201,35 @@ export class MonsterSystem {
     return closest;
   }
 
+  private createSpawnsFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): MonsterEntity[] {
+    if (placement.gameplay?.kind !== 'monsterSpawn') return [];
+
+    const spawnRadius = normalizePositiveNumber(placement.gameplay.spawnRadius, 160);
+    const maxAlive = Math.max(1, Math.min(50, Math.floor(normalizePositiveNumber(placement.gameplay.maxAlive, 1))));
+    const scale = normalizePositiveNumber(placement.scale, 1);
+    const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
+    const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
+    const centerX = placement.x + (displayWidth * scale) / 2;
+    const centerY = placement.y + (displayHeight * scale) / 2;
+    const monsters: MonsterEntity[] = [];
+
+    for (let i = 0; i < maxAlive; i += 1) {
+      const angle = (Math.PI * 2 * i) / maxAlive;
+      const radius = maxAlive <= 1 ? 0 : spawnRadius * 0.65;
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+      monsters.push(this.spawnAt(
+        placement.gameplay.monsterType,
+        x,
+        y,
+        `map-monster:${cellX}:${cellY}:${placement.id}:${i}`,
+        placement.gameplay.spec,
+      ));
+    }
+
+    return monsters;
+  }
+
   private spawn(type: MonsterType): MonsterEntity {
     return this.spawnAt(
       type,
@@ -186,21 +238,31 @@ export class MonsterSystem {
     );
   }
 
-  private spawnAt(type: MonsterType, x: number, y: number): MonsterEntity {
+  private spawnAt(
+    type: MonsterType,
+    x: number,
+    y: number,
+    id = shortId('mob'),
+    spec: WorldMapPlacement['gameplay'] extends infer Gameplay ? Gameplay extends { kind: 'monsterSpawn'; spec?: infer Spec } ? Spec : never : never = undefined as never,
+  ): MonsterEntity {
     const definition = getMonsterDefinition(type);
+    const maxHp = normalizePositiveNumber(spec?.maxHp, definition.maxHp);
+    const moveSpeed = normalizePositiveNumber(spec?.moveSpeed, definition.moveSpeed);
+    const detectRange = normalizePositiveNumber(spec?.detectRange, definition.ai.detectRange);
+    const loseRange = normalizePositiveNumber(spec?.loseRange, definition.ai.loseRange);
 
     return {
-      id: shortId('mob'),
+      id,
       type,
       x: clamp(x, definition.collision.radius, WORLD_WIDTH - definition.collision.radius),
       y: clamp(y, definition.collision.radius, WORLD_HEIGHT - definition.collision.radius),
-      hp: definition.maxHp,
-      maxHp: definition.maxHp,
+      hp: maxHp,
+      maxHp,
       state: 'idle',
       targetPlayerId: null,
-      speed: definition.moveSpeed,
-      detectRange: definition.ai.detectRange,
-      loseRange: definition.ai.loseRange,
+      speed: moveSpeed,
+      detectRange,
+      loseRange,
       nextAttackAt: 0,
     };
   }
@@ -228,4 +290,8 @@ function circlesOverlap(
   const dx = ax - bx;
   const dy = ay - by;
   return dx * dx + dy * dy < minDistance * minDistance;
+}
+
+function normalizePositiveNumber(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) && (value as number) > 0 ? (value as number) : fallback;
 }
