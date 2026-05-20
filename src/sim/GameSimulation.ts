@@ -23,7 +23,7 @@ export class GameSimulation {
 
   step(dt: number, nowMs: number, options: GameSimulationStepOptions = {}): void {
     this.world.tick += 1;
-    this.players.update(this.world, dt, { buildingGrid: options.buildingGrid });
+    this.players.update(this.world, dt, { buildingGrid: options.buildingGrid, nowMs });
     this.resources.update(this.world, nowMs);
     this.monsters.update(this.world, dt, { buildingGrid: options.buildingGrid, nowMs });
   }
