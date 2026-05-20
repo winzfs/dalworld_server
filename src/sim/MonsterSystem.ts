@@ -29,6 +29,7 @@ type CollisionCircle = {
 
 export type MonsterSystemUpdateOptions = {
   buildingGrid?: BuildingGrid;
+  nowMs?: number;
 };
 
 const TEMPLATES: Record<MonsterType, MonsterTemplate> = GAME_CONFIG.monster.templates;
@@ -53,12 +54,13 @@ export class MonsterSystem {
   }
 
   update(world: WorldState, dt: number, options: MonsterSystemUpdateOptions = {}): void {
+    const nowMs = options.nowMs ?? Date.now();
     for (const monster of world.monsters.values()) {
-      this.updateAi(monster, world, dt, options.buildingGrid);
+      this.updateAi(monster, world, dt, nowMs, options.buildingGrid);
     }
   }
 
-  private updateAi(monster: MonsterEntity, world: WorldState, dt: number, buildingGrid?: BuildingGrid): void {
+  private updateAi(monster: MonsterEntity, world: WorldState, dt: number, nowMs: number, buildingGrid?: BuildingGrid): void {
     const target = this.findOrKeepTarget(monster, world);
 
     if (!target) {
@@ -68,6 +70,14 @@ export class MonsterSystem {
     }
 
     monster.targetPlayerId = target.id;
+
+    const targetDistance = distance(monster.x, monster.y, target.x, target.y);
+    if (targetDistance <= GAME_CONFIG.combat.monsterAttackRange) {
+      monster.state = 'attack';
+      this.tryAttack(monster, target, nowMs, world);
+      return;
+    }
+
     monster.state = 'chase';
 
     const collision = getMonsterCollisionConfig(monster.type);
@@ -94,6 +104,27 @@ export class MonsterSystem {
     if (this.canOccupy(monster, monster.x, nextY, world, buildingGrid)) {
       monster.y = nextY;
     }
+  }
+
+  private tryAttack(monster: MonsterEntity, target: PlayerEntity, nowMs: number, world: WorldState): void {
+    if (target.hp <= 0) return;
+    if (nowMs < monster.nextAttackAt) return;
+    monster.nextAttackAt = nowMs + GAME_CONFIG.combat.monsterAttackCooldownMs;
+
+    const damage = GAME_CONFIG.combat.monsterAttackDamage;
+    target.hp = Math.max(0, target.hp - damage);
+    world.pushEvent({
+      type: 'combat_hit',
+      requestId: `monster:${monster.id}:${nowMs}`,
+      attackerId: monster.id,
+      targetId: target.id,
+      targetType: 'player',
+      damage,
+      hpRemaining: target.hp,
+      maxHp: target.maxHp,
+      x: target.x,
+      y: target.y,
+    });
   }
 
   private canOccupy(monster: MonsterEntity, x: number, y: number, world: WorldState, buildingGrid?: BuildingGrid): boolean {
@@ -134,7 +165,7 @@ export class MonsterSystem {
   private findOrKeepTarget(monster: MonsterEntity, world: WorldState): PlayerEntity | null {
     if (monster.targetPlayerId) {
       const current = world.players.get(monster.targetPlayerId);
-      if (current && distance(monster.x, monster.y, current.x, current.y) <= monster.loseRange) {
+      if (current && current.hp > 0 && distance(monster.x, monster.y, current.x, current.y) <= monster.loseRange) {
         return current;
       }
     }
@@ -143,6 +174,7 @@ export class MonsterSystem {
     let closestDist = monster.detectRange;
 
     for (const player of world.players.values()) {
+      if (player.hp <= 0) continue;
       const d = distance(monster.x, monster.y, player.x, player.y);
       if (d <= closestDist) {
         closest = player;
@@ -177,6 +209,7 @@ export class MonsterSystem {
       speed: template.speed,
       detectRange: template.detectRange,
       loseRange: template.loseRange,
+      nextAttackAt: 0,
     };
   }
 }
