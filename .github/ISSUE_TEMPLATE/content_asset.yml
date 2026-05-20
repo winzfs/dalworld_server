@@ -1,0 +1,48 @@
+name: Content / Game Data
+about: 아이템, 몬스터, 건설 부품, 제작법 등 게임 데이터 추가
+labels: [content]
+body:
+  - type: dropdown
+    id: content_type
+    attributes:
+      label: 콘텐츠 종류
+      options:
+        - item
+        - recipe
+        - monster
+        - resource
+        - building part
+        - combat rule
+        - status effect
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: 콘텐츠 설명
+    validations:
+      required: true
+  - type: textarea
+    id: server_rules
+    attributes:
+      label: 서버 검증 규칙
+      description: 비용, 거리, 쿨타임, 충돌, 소유권, 보상 등 서버가 검증해야 할 내용을 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: protocol
+    attributes:
+      label: 프로토콜/공유 데이터 변경 여부
+    validations:
+      required: true
+  - type: textarea
+    id: storage
+    attributes:
+      label: Storage / D1 영향
+      description: 영속화가 필요한지, version/migration이 필요한지 적어주세요.
+  - type: textarea
+    id: validation
+    attributes:
+      label: 검증 방법
+      placeholder: npm run check, 요청 성공/실패 케이스, snapshot/event 확인 등
