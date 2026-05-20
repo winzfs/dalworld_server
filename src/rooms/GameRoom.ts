@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { GAME_CONFIG, getPublicGameConfig } from '../config/gameConfig';
 import type { Env } from '../env';
 import type {
+  BuildingClientMessage,
   ClientToServerMessage,
   ServerEvent,
   ServerToClientMessage,
@@ -261,35 +262,11 @@ export class GameRoom extends DurableObject<Env> {
       case 'COMBAT_ATTACK_REQUEST':
         this.handleCombatMessage(socket, playerId, message);
         return;
-      case 'input': {
-        applyInput(player, message.seq, message.keys, message.facing);
-
-        if (Number.isFinite(message.cellX)) {
-          player.cellX = Math.trunc(message.cellX ?? player.cellX);
-        }
-        if (Number.isFinite(message.cellY)) {
-          player.cellY = Math.trunc(message.cellY ?? player.cellY);
-        }
-
-        if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
-          const cellSize = this.worldMap?.cellSize ?? WORLD_WIDTH;
-          const nextX = clamp(message.clientX ?? player.x, 0, cellSize);
-          const nextY = clamp(message.clientY ?? player.y, 0, cellSize);
-
-          if (
-            canCircleOccupyCell(this.worldMap, player.cellX, player.cellY, nextX, nextY, PLAYER_RADIUS) &&
-            this.buildingGrid.canOccupyWorldCircle(nextX, nextY, PLAYER_RADIUS)
-          ) {
-            player.x = nextX;
-            player.y = nextY;
-          }
-
-          player.input = { up: false, down: false, right: false, left: false };
-        }
-
+      case 'input':
+        this.handleInputMessage(player, message);
         return;
-      }
       case 'gather': {
+        if (isPlayerActionLocked(player)) return;
         const result = this.simulation.resources.gather(
           this.simulation.world,
           player,
@@ -301,6 +278,38 @@ export class GameRoom extends DurableObject<Env> {
         }
         return;
       }
+    }
+  }
+
+  private handleInputMessage(
+    player: PlayerEntity,
+    message: Extract<ClientToServerMessage, { type: 'input' }>,
+  ): void {
+    applyInput(player, message.seq, message.keys, message.facing);
+
+    if (isPlayerActionLocked(player)) return;
+
+    if (Number.isFinite(message.cellX)) {
+      player.cellX = Math.trunc(message.cellX ?? player.cellX);
+    }
+    if (Number.isFinite(message.cellY)) {
+      player.cellY = Math.trunc(message.cellY ?? player.cellY);
+    }
+
+    if (Number.isFinite(message.clientX) && Number.isFinite(message.clientY)) {
+      const cellSize = this.worldMap?.cellSize ?? WORLD_WIDTH;
+      const nextX = clamp(message.clientX ?? player.x, 0, cellSize);
+      const nextY = clamp(message.clientY ?? player.y, 0, cellSize);
+
+      if (
+        canCircleOccupyCell(this.worldMap, player.cellX, player.cellY, nextX, nextY, PLAYER_RADIUS) &&
+        this.buildingGrid.canOccupyWorldCircle(nextX, nextY, PLAYER_RADIUS)
+      ) {
+        player.x = nextX;
+        player.y = nextY;
+      }
+
+      player.input = { up: false, down: false, right: false, left: false };
     }
   }
 
@@ -347,7 +356,7 @@ export class GameRoom extends DurableObject<Env> {
   private handleBuildingMessage(
     socket: WebSocket,
     playerId: string,
-    message: ClientToServerMessage,
+    message: BuildingClientMessage,
   ): void {
     const player = this.simulation.world.players.get(playerId);
     if (!player) return;
@@ -527,6 +536,10 @@ export class GameRoom extends DurableObject<Env> {
       // socket already closed
     }
   }
+}
+
+function isPlayerActionLocked(player: PlayerEntity): boolean {
+  return player.hp <= 0 || player.respawnAt > 0;
 }
 
 function withCellCoordinates(rawCell: StoredWorldMapCell, gridX: number, gridY: number): StoredWorldMapCell {
