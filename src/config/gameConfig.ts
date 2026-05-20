@@ -56,9 +56,9 @@ export const GAME_CONFIG = {
   },
 
   combat: {
-    playerAttackRange: 92,
+    playerAttackRange: 120,
     playerAttackDamage: 18,
-    playerAttackCooldownMs: 420,
+    playerAttackCooldownMs: 360,
   },
 
   network: {
