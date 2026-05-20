@@ -8,8 +8,9 @@
     "deploy": "wrangler deploy",
     "build": "npm run data:generate && tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "check": "npm run data:generate && npm run typecheck && npm run check:protocol && npm run build",
+    "check": "npm run data:generate && npm run typecheck && npm run check:protocol && npm run check:data-sync && npm run build",
     "check:protocol": "node scripts/check-protocol-sync.mjs",
+    "check:data-sync": "node scripts/check-game-data-sync.mjs",
     "data:generate": "node scripts/generate-game-data.mjs",
     "db:migrate:local": "wrangler d1 migrations apply dalworld-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply dalworld-db --remote"
