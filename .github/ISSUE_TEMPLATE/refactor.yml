@@ -1,0 +1,42 @@
+name: Refactor
+about: 서버 구조 개선 또는 책임 분리 작업
+labels: [refactor]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 리팩터링 대상과 이유
+      description: GameRoom 또는 특정 서비스의 어떤 책임이 커졌는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: 책임 경계
+      description: GameRoom과 새 서비스/시스템이 각각 무엇을 담당해야 하는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: 서버 권위 구조 보존 방법
+      description: 리팩터링 후에도 요청 검증과 상태 확정이 서버에 남는지 설명해주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: storage
+    attributes:
+      label: Storage / D1 영향
+      description: 저장 key, version, migration 영향이 있는지 적어주세요.
+  - type: textarea
+    id: risk
+    attributes:
+      label: 기존 기능 영향/위험
+      description: 삭제되거나 약화될 수 있는 기능이 있는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: 검증 방법
+      placeholder: npm run check, wrangler dev, 기존 WebSocket/맵/건설/제작 회귀 확인 등
