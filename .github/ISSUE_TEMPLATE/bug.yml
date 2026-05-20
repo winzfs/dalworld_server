@@ -1,0 +1,41 @@
+name: Bug
+about: 서버 버그 수정 작업
+labels: [bug]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 문제 상황
+      description: 어떤 문제가 발생했는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대 동작
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 재현 방법
+      placeholder: 1. ...
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: 서버 판정/검증 영향
+      description: 어떤 서버 검증이나 상태 확정이 잘못됐는지 적어주세요.
+    validations:
+      required: true
+  - type: textarea
+    id: cloudflare
+    attributes:
+      label: Cloudflare Workers 호환성 영향
+      description: Node.js 전용 API, Durable Object storage, WebSocket, runtime 차이와 관련이 있는지 적어주세요.
+  - type: textarea
+    id: validation
+    attributes:
+      label: 수정 후 검증 방법
+      placeholder: npm run check, wrangler dev, 실패 케이스 재테스트 등
