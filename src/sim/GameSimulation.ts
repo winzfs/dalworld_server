@@ -25,7 +25,7 @@ export class GameSimulation {
     this.world.tick += 1;
     this.players.update(this.world, dt, { buildingGrid: options.buildingGrid });
     this.resources.update(this.world, nowMs);
-    this.monsters.update(this.world, dt, { buildingGrid: options.buildingGrid });
+    this.monsters.update(this.world, dt, { buildingGrid: options.buildingGrid, nowMs });
   }
 
   buildSnapshot(nowMs: number): ServerToClientMessage {
