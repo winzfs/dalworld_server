@@ -19,6 +19,7 @@ import { CombatService } from '../systems/combat/CombatService';
 import { CraftingService } from '../systems/crafting/CraftingService';
 import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
+import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap, WorldMapCell, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
@@ -127,7 +128,7 @@ export class GameRoom extends DurableObject<Env> {
 
     const playerId = getStablePlayerId(url);
     this.sessions.set(server, playerId);
-    this.simulation.world.players.set(playerId, createPlayer(playerId));
+    this.simulation.world.players.set(playerId, createPlayer(playerId, url.searchParams.get('name') ?? undefined));
 
     const now = Date.now();
     const publicConfig = getPublicGameConfig();
@@ -249,6 +250,7 @@ export class GameRoom extends DurableObject<Env> {
         this.send(socket, { type: 'pong', now: message.now });
         return;
       case 'hello':
+        setPlayerCharacterName(player, message.name);
         return;
       case 'TIME_OF_DAY_TOGGLE_REQUEST':
         this.toggleTimeOfDay();
