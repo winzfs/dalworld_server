@@ -19,6 +19,10 @@ export const PLAYER_RADIUS = GAME_CONFIG.player.radius;
 
 export type PlayerEntity = {
   id: string;
+  characterName: string;
+  level: number;
+  exp: number;
+  expToNextLevel: number;
   x: number;
   y: number;
   cellX: number;
@@ -131,6 +135,10 @@ export class WorldState {
   toPlayerSnapshots(): PlayerSnapshot[] {
     return [...this.players.values()].map((p) => ({
       id: p.id,
+      characterName: p.characterName,
+      level: p.level,
+      exp: p.exp,
+      expToNextLevel: p.expToNextLevel,
       x: p.x,
       y: p.y,
       cellX: p.cellX,
