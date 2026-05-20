@@ -20,6 +20,7 @@ import { CraftingService } from '../systems/crafting/CraftingService';
 import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
+import { PlayerProgressionStore } from '../systems/player/PlayerProgressionStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap, WorldMapCell, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
@@ -33,6 +34,7 @@ const BUILDING_STORAGE_KEY = 'world:buildings';
 const BUILDING_GRID_WIDTH = 256;
 const BUILDING_GRID_HEIGHT = 256;
 const BUILDING_GRID_MAX_Z = 8;
+const PLAYER_PROGRESSION_AUTOSAVE_MS = 10_000;
 
 type RateLimitEntry = { count: number; resetAt: number };
 
@@ -77,6 +79,7 @@ export class GameRoom extends DurableObject<Env> {
   });
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private lastStepAt = Date.now();
+  private lastProgressionSaveAt = 0;
   private worldMap: GameWorldMap | null = null;
   private timeOfDay: TimeOfDayState = { mode: 'day' };
   private buildingsLoaded = false;
@@ -127,8 +130,10 @@ export class GameRoom extends DurableObject<Env> {
     server.accept();
 
     const playerId = getStablePlayerId(url);
+    const player = createPlayer(playerId, url.searchParams.get('name') ?? undefined);
+    await this.loadPlayerProgression(player);
     this.sessions.set(server, playerId);
-    this.simulation.world.players.set(playerId, createPlayer(playerId, url.searchParams.get('name') ?? undefined));
+    this.simulation.world.players.set(playerId, player);
 
     const now = Date.now();
     const publicConfig = getPublicGameConfig();
@@ -161,6 +166,37 @@ export class GameRoom extends DurableObject<Env> {
     server.addEventListener('error', () => this.closeSession(server));
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private getPlayerProgressionStore(): PlayerProgressionStore {
+    return new PlayerProgressionStore(this.env.DB);
+  }
+
+  private async loadPlayerProgression(player: PlayerEntity): Promise<void> {
+    try {
+      const store = this.getPlayerProgressionStore();
+      const stored = await store.load(player.id);
+      store.applyToPlayer(player, stored);
+    } catch (error) {
+      console.warn('[PlayerProgression] failed to load player progression', error);
+    }
+  }
+
+  private persistPlayerProgression(player: PlayerEntity): void {
+    this.getPlayerProgressionStore()
+      .save(player)
+      .catch((error) => {
+        console.warn('[PlayerProgression] failed to persist player progression', error);
+      });
+  }
+
+  private persistAllPlayerProgression(nowMs: number): void {
+    if (nowMs - this.lastProgressionSaveAt < PLAYER_PROGRESSION_AUTOSAVE_MS) return;
+    this.lastProgressionSaveAt = nowMs;
+
+    for (const player of this.simulation.world.players.values()) {
+      this.persistPlayerProgression(player);
+    }
   }
 
   private setWorldMap(map: GameWorldMap | null): void {
@@ -251,6 +287,7 @@ export class GameRoom extends DurableObject<Env> {
         return;
       case 'hello':
         setPlayerCharacterName(player, message.name);
+        this.persistPlayerProgression(player);
         return;
       case 'TIME_OF_DAY_TOGGLE_REQUEST':
         this.toggleTimeOfDay();
@@ -281,6 +318,7 @@ export class GameRoom extends DurableObject<Env> {
         );
         if (result.ok) {
           player.lastInputSeq = Math.max(player.lastInputSeq, message.seq);
+          this.persistPlayerProgression(player);
         }
         return;
       }
@@ -357,6 +395,10 @@ export class GameRoom extends DurableObject<Env> {
         updatedAt: result.inventorySnapshot.updatedAt,
       });
     }
+
+    if (result.events.some((event) => event.type !== 'COMBAT_REJECTED')) {
+      this.persistPlayerProgression(player);
+    }
   }
 
   private handleBuildingMessage(
@@ -384,10 +426,12 @@ export class GameRoom extends DurableObject<Env> {
           : service.toggleDoor(playerId, message);
 
     let didMutateBuildings = false;
+    let didMutateInventory = false;
 
     for (const event of result.events) {
       if (event.type === 'INVENTORY_SNAPSHOT') {
         this.applyInventorySnapshot(player, event);
+        didMutateInventory = true;
       }
 
       if (
@@ -407,6 +451,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (didMutateBuildings) this.persistBuildings();
+    if (didMutateInventory) this.persistPlayerProgression(player);
   }
 
   private handleCraftingMessage(
@@ -430,6 +475,7 @@ export class GameRoom extends DurableObject<Env> {
 
     const snapshot = store.toSnapshot();
     this.applyInventorySnapshot(player, snapshot);
+    this.persistPlayerProgression(player);
     this.send(socket, {
       type: 'CRAFT_COMPLETED',
       requestId,
@@ -469,6 +515,7 @@ export class GameRoom extends DurableObject<Env> {
       this.lastStepAt = now;
 
       this.simulation.step(dt, now, { buildingGrid: this.buildingGrid });
+      this.persistAllPlayerProgression(now);
       this.broadcastSnapshot(now);
       this.flushEvents(now);
 
@@ -532,6 +579,8 @@ export class GameRoom extends DurableObject<Env> {
     this.rateLimits.delete(socket);
 
     if (playerId) {
+      const player = this.simulation.world.players.get(playerId);
+      if (player) this.persistPlayerProgression(player);
       this.simulation.world.players.delete(playerId);
       this.simulation.world.pushEvent({ type: 'player_left', playerId });
     }
