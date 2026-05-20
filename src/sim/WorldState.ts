@@ -36,6 +36,8 @@ export type PlayerEntity = {
   input: MovementKeys;
   /** epoch ms when next gather is allowed */
   nextGatherAt: number;
+  /** epoch ms when next player attack is allowed */
+  nextAttackAt: number;
 };
 
 export type ResourceEntity = {
@@ -70,6 +72,7 @@ export type MonsterEntity = {
   speed: number;
   detectRange: number;
   loseRange: number;
+  nextAttackAt: number;
 };
 
 export class WorldState {
