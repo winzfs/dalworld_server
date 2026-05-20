@@ -4,6 +4,7 @@ import type { MonsterEntity, PlayerEntity, WorldState } from '../../sim/WorldSta
 import { distance } from '../../utils/math';
 import type { InventorySnapshot, InventoryStore } from '../inventory/InventoryStore';
 import { getMonsterDefinition } from '../monster/MonsterDefinitions';
+import { getExpRewardForMonster, grantPlayerExperience } from '../player/PlayerProgression';
 
 type CombatServiceOptions = {
   now: () => number;
@@ -90,6 +91,8 @@ export class CombatService {
         y: target.y,
       });
 
+      this.grantExperience(playerId, player, target, request.requestId, events);
+
       const rewardSnapshot = this.grantRewards(playerId, player, target, request.requestId, events);
       if (rewardSnapshot) {
         return { events, inventorySnapshot: rewardSnapshot };
@@ -97,6 +100,42 @@ export class CombatService {
     }
 
     return { events };
+  }
+
+  private grantExperience(
+    playerId: string,
+    player: PlayerEntity,
+    target: MonsterEntity,
+    requestId: string,
+    events: CombatServerEvent[],
+  ): void {
+    const amount = getExpRewardForMonster(target.type);
+    const result = grantPlayerExperience(player, amount);
+    if (result.amount <= 0) return;
+
+    events.push({
+      type: 'PLAYER_EXPERIENCE_GAINED',
+      requestId,
+      playerId,
+      sourceType: 'monster',
+      sourceId: target.id,
+      amount: result.amount,
+      level: player.level,
+      exp: player.exp,
+      expToNextLevel: player.expToNextLevel,
+    });
+
+    if (result.leveledUp) {
+      events.push({
+        type: 'PLAYER_LEVEL_UP',
+        requestId,
+        playerId,
+        previousLevel: result.previousLevel,
+        level: player.level,
+        maxHp: player.maxHp,
+        maxStamina: player.maxStamina,
+      });
+    }
   }
 
   private grantRewards(
