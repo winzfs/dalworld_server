@@ -282,15 +282,14 @@ export class MonsterSystem {
     const scale = normalizePositiveNumber(placement.scale, 1);
     const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
-    const cellSize = this.worldMap?.cellSize ?? WORLD_WIDTH;
 
     return {
       id: `map-spawn:${cellX}:${cellY}:${placement.id}`,
       cellX,
       cellY,
       monsterType: placement.gameplay.monsterType,
-      centerX: placement.x + cellX * cellSize + (displayWidth * scale) / 2,
-      centerY: placement.y + cellY * cellSize + (displayHeight * scale) / 2,
+      centerX: placement.x + (displayWidth * scale) / 2,
+      centerY: placement.y + (displayHeight * scale) / 2,
       radius: spawnRadius,
       maxAlive,
       respawnMs,
@@ -328,8 +327,9 @@ export class MonsterSystem {
 
     for (let attempt = 0; attempt < SPAWN_POSITION_ATTEMPTS; attempt += 1) {
       const cell = cells[(Math.abs(Math.floor(seed + attempt)) % cells.length)];
-      const x = cell.gridX * cellSize + randomRange(64, Math.max(65, cellSize - 64));
-      const y = cell.gridY * cellSize + randomRange(64, Math.max(65, cellSize - 64));
+      void cell;
+      const x = randomRange(64, Math.max(65, cellSize - 64));
+      const y = randomRange(64, Math.max(65, cellSize - 64));
       if (!this.canSpawnAt(rule.monsterType, x, y, world, buildingGrid)) continue;
       return this.spawnAt(rule.monsterType, x, y, `map-rule-monster:${rule.id}:${seed}:${attempt}`, rule.spec, undefined, rule.id);
     }
@@ -415,24 +415,20 @@ function spawnIntervalMs(spawnsPerHour: number): number {
   return Math.max(1_000, Math.floor(3_600_000 / Math.max(1, spawnsPerHour)));
 }
 
-function getWorldMinX(map: GameWorldMap | null): number {
-  if (!map || map.cells.length === 0) return 0;
-  return Math.min(...map.cells.map((cell) => cell.gridX)) * map.cellSize;
+function getWorldMinX(_map: GameWorldMap | null): number {
+  return 0;
 }
 
-function getWorldMinY(map: GameWorldMap | null): number {
-  if (!map || map.cells.length === 0) return 0;
-  return Math.min(...map.cells.map((cell) => cell.gridY)) * map.cellSize;
+function getWorldMinY(_map: GameWorldMap | null): number {
+  return 0;
 }
 
 function getWorldMaxX(map: GameWorldMap | null): number {
-  if (!map || map.cells.length === 0) return WORLD_WIDTH;
-  return (Math.max(...map.cells.map((cell) => cell.gridX)) + 1) * map.cellSize;
+  return map?.cellSize ?? WORLD_WIDTH;
 }
 
 function getWorldMaxY(map: GameWorldMap | null): number {
-  if (!map || map.cells.length === 0) return WORLD_HEIGHT;
-  return (Math.max(...map.cells.map((cell) => cell.gridY)) + 1) * map.cellSize;
+  return map?.cellSize ?? WORLD_HEIGHT;
 }
 
 function circlesOverlap(
