@@ -14,6 +14,7 @@ import { PLAYER_RADIUS, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState
 import { BuildingGrid } from '../systems/building/BuildingGrid';
 import { BuildingService } from '../systems/building/BuildingService';
 import type { BuildingSnapshot } from '../systems/building/BuildingTypes';
+import { CombatService } from '../systems/combat/CombatService';
 import { CraftingService } from '../systems/crafting/CraftingService';
 import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
@@ -257,6 +258,9 @@ export class GameRoom extends DurableObject<Env> {
       case 'CRAFT_REQUEST':
         this.handleCraftingMessage(socket, playerId, message.requestId, message.recipeId);
         return;
+      case 'COMBAT_ATTACK_REQUEST':
+        this.handleCombatMessage(socket, playerId, message);
+        return;
       case 'input': {
         applyInput(player, message.seq, message.keys, message.facing);
 
@@ -304,6 +308,40 @@ export class GameRoom extends DurableObject<Env> {
     this.timeOfDay = {
       mode: this.timeOfDay.mode === 'day' ? 'night' : 'day',
     };
+  }
+
+  private handleCombatMessage(
+    socket: WebSocket,
+    playerId: string,
+    message: Extract<ClientToServerMessage, { type: 'COMBAT_ATTACK_REQUEST' }>,
+  ): void {
+    const player = this.simulation.world.players.get(playerId);
+    if (!player) return;
+
+    const combat = new CombatService({
+      now: () => Date.now(),
+      getInventory: (id, owner) => this.createInventoryStore(id, owner),
+    });
+
+    const result = combat.attack(this.simulation.world, playerId, message);
+
+    for (const event of result.events) {
+      if (event.type === 'COMBAT_REJECTED') {
+        this.send(socket, event);
+      } else {
+        this.broadcast(event);
+      }
+    }
+
+    if (result.inventorySnapshot) {
+      this.applyInventorySnapshot(player, result.inventorySnapshot);
+      this.send(socket, {
+        type: 'INVENTORY_SNAPSHOT',
+        ownerId: result.inventorySnapshot.ownerId,
+        items: result.inventorySnapshot.items,
+        updatedAt: result.inventorySnapshot.updatedAt,
+      });
+    }
   }
 
   private handleBuildingMessage(
