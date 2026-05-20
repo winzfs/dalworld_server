@@ -38,6 +38,7 @@ export function createPlayer(id: string): PlayerEntity {
     input: { up: false, down: false, left: false, right: false },
     nextGatherAt: 0,
     nextAttackAt: 0,
+    respawnAt: 0,
   };
 }
 
@@ -49,6 +50,10 @@ export function applyInput(
 ): void {
   if (seq <= player.lastInputSeq) return;
   player.lastInputSeq = seq;
+  if (player.respawnAt > 0) {
+    player.input = { up: false, down: false, left: false, right: false };
+    return;
+  }
   player.input = {
     up: keys.up === true,
     down: keys.down === true,
@@ -60,13 +65,39 @@ export function applyInput(
 
 export type PlayerSystemUpdateOptions = {
   buildingGrid?: BuildingGrid;
+  nowMs?: number;
 };
 
 export class PlayerSystem {
   update(world: WorldState, dt: number, options: PlayerSystemUpdateOptions = {}): void {
+    const nowMs = options.nowMs ?? Date.now();
     for (const player of world.players.values()) {
+      this.updateDeathState(player, nowMs);
+      if (player.respawnAt > 0) continue;
       this.movePlayer(player, dt, options.buildingGrid);
       this.regenerate(player, dt);
+    }
+  }
+
+  private updateDeathState(player: PlayerEntity, nowMs: number): void {
+    if (player.hp <= 0 && player.respawnAt === 0) {
+      player.hp = 0;
+      player.input = { up: false, down: false, left: false, right: false };
+      player.respawnAt = nowMs + GAME_CONFIG.player.respawnMs;
+      return;
+    }
+
+    if (player.respawnAt > 0 && nowMs >= player.respawnAt) {
+      player.x = WORLD_WIDTH / 2;
+      player.y = WORLD_HEIGHT / 2;
+      player.cellX = 0;
+      player.cellY = 0;
+      player.hp = player.maxHp;
+      player.stamina = player.maxStamina;
+      player.input = { up: false, down: false, left: false, right: false };
+      player.nextAttackAt = 0;
+      player.nextGatherAt = 0;
+      player.respawnAt = 0;
     }
   }
 
