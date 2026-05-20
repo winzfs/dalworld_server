@@ -1,6 +1,18 @@
+import type { MonsterType } from '../protocol/messages';
+
 export type WorldMapLayerId = 'ground' | 'object' | 'collision';
 
 export type WorldMapResourceType = 'tree' | 'stone';
+
+export type WorldMapMonsterSpecOverrides = {
+  maxHp?: number;
+  moveSpeed?: number;
+  detectRange?: number;
+  loseRange?: number;
+  attackRange?: number;
+  attackDamage?: number;
+  attackCooldownMs?: number;
+};
 
 export type WorldMapPlacementGameplay =
   | {
@@ -9,6 +21,14 @@ export type WorldMapPlacementGameplay =
       blocksMovement?: boolean;
       maxHp?: number;
       respawnMs?: number;
+    }
+  | {
+      kind: 'monsterSpawn';
+      monsterType: MonsterType;
+      spawnRadius: number;
+      maxAlive: number;
+      respawnMs: number;
+      spec?: WorldMapMonsterSpecOverrides;
     };
 
 export type WorldMapSourceRect = {
