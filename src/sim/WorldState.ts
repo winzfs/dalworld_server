@@ -74,6 +74,7 @@ export type MonsterEntity = {
   hp: number;
   maxHp: number;
   state: MonsterStateName;
+  facing: Facing;
   targetPlayerId: string | null;
   speed: number;
   detectRange: number;
