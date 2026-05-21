@@ -1,6 +1,6 @@
 import type { PlayerEntity } from '../../sim/WorldState';
 import type { InventoryItemStack } from '../inventory/InventoryStore';
-import { parseQuestStateJson } from '../quest/QuestService';
+import { parseQuestStateJson, serializeQuestState } from '../quest/QuestService';
 import {
   applyLevelDerivedStats,
   getExpToNextLevel,
@@ -60,6 +60,7 @@ export class PlayerProgressionStore {
 
   async save(player: PlayerEntity, nowMs = Date.now()): Promise<void> {
     const inventoryJson = JSON.stringify(player.inventoryItems);
+    const questStateJson = serializeQuestState(player.questState);
 
     await this.db
       .prepare(
@@ -74,9 +75,10 @@ export class PlayerProgressionStore {
            hp,
            stamina,
            inventory_json,
+           quest_state_json,
            created_at,
            updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(player_id) DO UPDATE SET
            character_name = excluded.character_name,
            level = excluded.level,
@@ -87,6 +89,7 @@ export class PlayerProgressionStore {
            hp = excluded.hp,
            stamina = excluded.stamina,
            inventory_json = excluded.inventory_json,
+           quest_state_json = excluded.quest_state_json,
            updated_at = excluded.updated_at`,
       )
       .bind(
@@ -100,6 +103,7 @@ export class PlayerProgressionStore {
         player.hp,
         player.stamina,
         inventoryJson,
+        questStateJson,
         nowMs,
         nowMs,
       )
