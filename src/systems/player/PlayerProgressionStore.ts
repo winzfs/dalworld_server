@@ -1,5 +1,6 @@
 import type { PlayerEntity } from '../../sim/WorldState';
 import type { InventoryItemStack } from '../inventory/InventoryStore';
+import { parseQuestStateJson } from '../quest/QuestService';
 import {
   applyLevelDerivedStats,
   getExpToNextLevel,
@@ -17,6 +18,7 @@ export type StoredPlayerProgression = {
   hp: number;
   stamina: number;
   inventory_json: string | null;
+  quest_state_json: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -27,7 +29,7 @@ export class PlayerProgressionStore {
   async load(playerId: string): Promise<StoredPlayerProgression | null> {
     return await this.db
       .prepare(
-        `SELECT player_id, character_name, level, exp, exp_to_next_level, max_hp, max_stamina, hp, stamina, inventory_json, created_at, updated_at
+        `SELECT player_id, character_name, level, exp, exp_to_next_level, max_hp, max_stamina, hp, stamina, inventory_json, quest_state_json, created_at, updated_at
          FROM player_progression
          WHERE player_id = ?`,
       )
@@ -46,6 +48,7 @@ export class PlayerProgressionStore {
 
     player.hp = clampNumber(stored.hp, 0, player.maxHp, player.maxHp);
     player.stamina = clampNumber(stored.stamina, 0, player.maxStamina, player.maxStamina);
+    player.questState = parseQuestStateJson(stored.quest_state_json);
 
     const inventoryItems = parseInventoryItems(stored.inventory_json);
     if (inventoryItems) {
