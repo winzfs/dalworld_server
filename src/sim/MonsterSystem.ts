@@ -1,5 +1,5 @@
 import { getMonsterDefinition } from '../systems/monster/MonsterDefinitions';
-import type { MonsterType } from '../protocol/messages';
+import type { Facing, MonsterType } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { shortId } from '../utils/ids';
 import { clamp, distance, normalize, randomRange } from '../utils/math';
@@ -155,6 +155,7 @@ export class MonsterSystem {
     }
 
     monster.targetPlayerId = target.id;
+    monster.facing = getFacingFromDelta(target.x - monster.x, target.y - monster.y, monster.facing);
 
     const targetDistance = distance(monster.x, monster.y, target.x, target.y);
     if (targetDistance <= monster.attackRange) {
@@ -371,6 +372,7 @@ export class MonsterSystem {
       hp: maxHp,
       maxHp,
       state: 'idle',
+      facing: 'down',
       targetPlayerId: null,
       speed: moveSpeed,
       detectRange,
@@ -394,6 +396,12 @@ function getCollisionCircle(type: MonsterType, x: number, y: number): CollisionC
     y: y + collision.offsetY,
     radius: collision.radius,
   };
+}
+
+function getFacingFromDelta(dx: number, dy: number, fallback: Facing): Facing {
+  if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return fallback;
+  if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? 'left' : 'right';
+  return dy < 0 ? 'up' : 'down';
 }
 
 function countRegionMonsters(world: WorldState, regionId: string): number {
