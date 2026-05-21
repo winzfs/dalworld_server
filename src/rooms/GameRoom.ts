@@ -24,6 +24,7 @@ import { getFastestCraftSpeedMultiplierForPlayerInventory } from '../systems/inv
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
 import { PlayerProgressionStore } from '../systems/player/PlayerProgressionStore';
+import { QuestService } from '../systems/quest/QuestService';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
 import type { GameWorldMap, WorldMapCell, WorldMapItemOverride, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
@@ -457,6 +458,8 @@ export class GameRoom extends DurableObject<Env> {
 
     let didMutateBuildings = false;
     let didMutateInventory = false;
+    let didMutateQuest = false;
+    const questService = new QuestService();
 
     for (const event of result.events) {
       if (event.type === 'INVENTORY_SNAPSHOT') {
@@ -473,6 +476,10 @@ export class GameRoom extends DurableObject<Env> {
         didMutateBuildings = true;
       }
 
+      if (event.type === 'BUILD_PLACED') {
+        didMutateQuest = questService.grantPlacedBuildPart(player.questState, event.part.partId, 1) || didMutateQuest;
+      }
+
       if (event.type === 'BUILD_REJECTED' || event.type === 'INVENTORY_SNAPSHOT') {
         this.send(socket, event);
       } else {
@@ -481,7 +488,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (didMutateBuildings) this.persistBuildings();
-    if (didMutateInventory) this.persistPlayerProgression(player);
+    if (didMutateInventory || didMutateQuest) this.persistPlayerProgression(player);
   }
 
   private handleCraftingMessage(
