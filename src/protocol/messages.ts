@@ -100,7 +100,7 @@ export type PublicGameConfig = {
   gameplay: PublicGameplayConfig;
 };
 
-export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildUpdateRequest | BuildDoorToggleRequest;
+export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildDoorToggleRequest;
 
 export type CraftingClientMessage = {
   type: 'CRAFT_REQUEST';
