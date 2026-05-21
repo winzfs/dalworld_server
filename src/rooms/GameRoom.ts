@@ -17,6 +17,7 @@ import { BuildingService } from '../systems/building/BuildingService';
 import type { BuildingSnapshot } from '../systems/building/BuildingTypes';
 import { CombatService } from '../systems/combat/CombatService';
 import { CraftingService } from '../systems/crafting/CraftingService';
+import { getCraftingRecipe } from '../systems/crafting/CraftingRecipes';
 import { InventoryService } from '../systems/inventory/InventoryService';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
@@ -35,8 +36,16 @@ const BUILDING_GRID_WIDTH = 256;
 const BUILDING_GRID_HEIGHT = 256;
 const BUILDING_GRID_MAX_Z = 8;
 const PLAYER_PROGRESSION_AUTOSAVE_MS = 10_000;
+const MIN_CRAFTING_DURATION_MS = 250;
 
 type RateLimitEntry = { count: number; resetAt: number };
+
+type PendingCraft = {
+  playerId: string;
+  requestId: string;
+  recipeId: string;
+  completesAt: number;
+};
 
 type WorldMapManifest = {
   version: 1;
@@ -72,6 +81,7 @@ export class GameRoom extends DurableObject<Env> {
   private readonly simulation = new GameSimulation();
   private readonly sessions = new Map<WebSocket, string>();
   private readonly rateLimits = new Map<WebSocket, RateLimitEntry>();
+  private readonly pendingCrafts = new Map<string, PendingCraft>();
   private readonly buildingGrid = new BuildingGrid({
     width: BUILDING_GRID_WIDTH,
     height: BUILDING_GRID_HEIGHT,
@@ -463,25 +473,54 @@ export class GameRoom extends DurableObject<Env> {
     const player = this.simulation.world.players.get(playerId);
     if (!player) return;
 
-    const store = this.createInventoryStore(playerId, player);
+    const recipe = getCraftingRecipe(recipeId);
+    if (!recipe) {
+      this.send(socket, { type: 'CRAFT_REJECTED', requestId, reason: '존재하지 않는 제작 레시피입니다.' });
+      return;
+    }
+
+    const craftingMs = Math.max(MIN_CRAFTING_DURATION_MS, Math.floor((recipe.craftSeconds ?? 0) * 1000));
+    const startsAt = Date.now();
+    const completesAt = startsAt + craftingMs;
+
+    this.pendingCrafts.set(requestId, { playerId, requestId, recipeId, completesAt });
+    this.broadcast({ type: 'CRAFT_STARTED', requestId, recipeId, startsAt, completesAt });
+  }
+
+  private completeDueCrafts(nowMs: number): void {
+    for (const pending of [...this.pendingCrafts.values()]) {
+      if (pending.completesAt > nowMs) continue;
+      this.pendingCrafts.delete(pending.requestId);
+      this.completeCraft(pending);
+    }
+  }
+
+  private completeCraft(pending: PendingCraft): void {
+    const player = this.simulation.world.players.get(pending.playerId);
+    if (!player) return;
+
+    const store = this.createInventoryStore(pending.playerId, player);
     const inventory = new InventoryService({ getStore: () => store });
     const crafting = new CraftingService({ inventory });
-    const result = crafting.craft(playerId, recipeId);
+    const result = crafting.craft(pending.playerId, pending.recipeId);
+    const socket = this.findSocketByPlayerId(pending.playerId);
 
     if (!result.ok) {
-      this.send(socket, { type: 'CRAFT_REJECTED', requestId, reason: result.reason });
+      if (socket) this.send(socket, { type: 'CRAFT_REJECTED', requestId: pending.requestId, reason: result.reason });
       return;
     }
 
     const snapshot = store.toSnapshot();
     this.applyInventorySnapshot(player, snapshot);
     this.persistPlayerProgression(player);
-    this.send(socket, {
-      type: 'CRAFT_COMPLETED',
-      requestId,
-      recipeId: result.recipe.id,
-      inventory: snapshot,
-    });
+    if (socket) {
+      this.send(socket, {
+        type: 'CRAFT_COMPLETED',
+        requestId: pending.requestId,
+        recipeId: result.recipe.id,
+        inventory: snapshot,
+      });
+    }
   }
 
   private createInventoryStore(playerId: string, player: PlayerEntity): InventoryStore {
@@ -492,6 +531,13 @@ export class GameRoom extends DurableObject<Env> {
     player.inventoryItems = snapshot.items;
     player.inventory.wood = snapshot.items.find((item) => item.itemId === 'wood')?.quantity ?? 0;
     player.inventory.stone = snapshot.items.find((item) => item.itemId === 'stone')?.quantity ?? 0;
+  }
+
+  private findSocketByPlayerId(playerId: string): WebSocket | null {
+    for (const [socket, id] of this.sessions) {
+      if (id === playerId) return socket;
+    }
+    return null;
   }
 
   private checkRateLimit(socket: WebSocket): boolean {
@@ -515,6 +561,7 @@ export class GameRoom extends DurableObject<Env> {
       this.lastStepAt = now;
 
       this.simulation.step(dt, now, { buildingGrid: this.buildingGrid });
+      this.completeDueCrafts(now);
       this.persistAllPlayerProgression(now);
       this.broadcastSnapshot(now);
       this.flushEvents(now);
@@ -582,6 +629,9 @@ export class GameRoom extends DurableObject<Env> {
       const player = this.simulation.world.players.get(playerId);
       if (player) this.persistPlayerProgression(player);
       this.simulation.world.players.delete(playerId);
+      this.pendingCrafts.forEach((pending, requestId) => {
+        if (pending.playerId === playerId) this.pendingCrafts.delete(requestId);
+      });
       this.simulation.world.pushEvent({ type: 'player_left', playerId });
     }
 
