@@ -1,4 +1,5 @@
 import type { Env } from '../../env';
+import { ensureAuthSchema } from './AuthSchema';
 import { AuthService } from './AuthService';
 
 export async function handleAuthRequest(request: Request, env: Env): Promise<Response | null> {
@@ -6,6 +7,10 @@ export async function handleAuthRequest(request: Request, env: Env): Promise<Res
   const auth = new AuthService(env.DB);
 
   try {
+    if (isAuthWriteOrReadPath(url.pathname)) {
+      await ensureAuthSchema(env.DB);
+    }
+
     if (url.pathname === '/auth/register' && request.method === 'POST') {
       const body = await readJsonBody<{ username?: unknown; password?: unknown }>(request);
       const result = await auth.register(String(body.username ?? ''), String(body.password ?? ''));
@@ -57,6 +62,14 @@ async function readJsonBody<T>(request: Request): Promise<T> {
   } catch {
     return {} as T;
   }
+}
+
+function isAuthWriteOrReadPath(pathname: string): boolean {
+  return pathname === '/auth/register' ||
+    pathname === '/auth/login' ||
+    pathname === '/auth/logout' ||
+    pathname === '/auth/me' ||
+    pathname === '/characters';
 }
 
 function getSafeAuthErrorReason(error: unknown): string {
