@@ -1,11 +1,18 @@
 import { isInventoryItemId } from '../inventory/ItemDefinitions';
 import type { InventoryService } from '../inventory/InventoryService';
+import type { InventorySnapshot } from '../inventory/InventoryStore';
 import { getCraftingRecipe } from './CraftingRecipes';
 import type { CraftingRecipeDefinition } from './CraftingTypes';
 
-export type CraftingResult =
-  | { ok: true; recipe: CraftingRecipeDefinition }
+export type CraftingStartResult =
+  | { ok: true; recipe: CraftingRecipeDefinition; inventory: InventorySnapshot }
   | { ok: false; reason: string };
+
+export type CraftingCompleteResult =
+  | { ok: true; recipe: CraftingRecipeDefinition; inventory: InventorySnapshot }
+  | { ok: false; reason: string };
+
+export type CraftingResult = CraftingCompleteResult;
 
 export type CraftingServiceOptions = {
   inventory: InventoryService;
@@ -18,7 +25,7 @@ export class CraftingService {
     this.inventory = options.inventory;
   }
 
-  craft(ownerId: string, recipeId: string): CraftingResult {
+  startCraft(ownerId: string, recipeId: string): CraftingStartResult {
     const recipe = getCraftingRecipe(recipeId);
     if (!recipe) return { ok: false, reason: '존재하지 않는 제작 레시피입니다.' };
 
@@ -36,10 +43,26 @@ export class CraftingService {
     const consume = this.inventory.consume(ownerId, recipe.inputs);
     if (!consume.ok) return { ok: false, reason: consume.reason };
 
+    return { ok: true, recipe, inventory: consume.snapshot };
+  }
+
+  completeCraft(ownerId: string, recipeId: string): CraftingCompleteResult {
+    const recipe = getCraftingRecipe(recipeId);
+    if (!recipe) return { ok: false, reason: '존재하지 않는 제작 레시피입니다.' };
+
+    const validation = this.validateRecipe(recipe);
+    if (!validation.ok) return validation;
+
     const grant = this.inventory.grantAll(ownerId, recipe.outputs);
     if (!grant.ok) return { ok: false, reason: grant.reason };
 
-    return { ok: true, recipe };
+    return { ok: true, recipe, inventory: grant.snapshot };
+  }
+
+  craft(ownerId: string, recipeId: string): CraftingResult {
+    const started = this.startCraft(ownerId, recipeId);
+    if (!started.ok) return started;
+    return this.completeCraft(ownerId, recipeId);
   }
 
   private validateRecipe(recipe: CraftingRecipeDefinition): { ok: true } | { ok: false; reason: string } {
