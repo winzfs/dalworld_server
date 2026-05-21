@@ -479,6 +479,24 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
 
+    const store = this.createInventoryStore(playerId, player);
+    const inventory = new InventoryService({ getStore: () => store });
+    const crafting = new CraftingService({ inventory });
+    const started = crafting.startCraft(playerId, recipeId);
+    if (!started.ok) {
+      this.send(socket, { type: 'CRAFT_REJECTED', requestId, reason: started.reason });
+      return;
+    }
+
+    this.applyInventorySnapshot(player, started.inventory);
+    this.persistPlayerProgression(player);
+    this.send(socket, {
+      type: 'INVENTORY_SNAPSHOT',
+      ownerId: started.inventory.ownerId,
+      items: started.inventory.items,
+      updatedAt: started.inventory.updatedAt,
+    });
+
     const craftingMs = Math.max(MIN_CRAFTING_DURATION_MS, Math.floor((recipe.craftSeconds ?? 0) * 1000));
     const startsAt = Date.now();
     const completesAt = startsAt + craftingMs;
@@ -502,7 +520,7 @@ export class GameRoom extends DurableObject<Env> {
     const store = this.createInventoryStore(pending.playerId, player);
     const inventory = new InventoryService({ getStore: () => store });
     const crafting = new CraftingService({ inventory });
-    const result = crafting.craft(pending.playerId, pending.recipeId);
+    const result = crafting.completeCraft(pending.playerId, pending.recipeId);
     const socket = this.findSocketByPlayerId(pending.playerId);
 
     if (!result.ok) {
@@ -510,15 +528,14 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
 
-    const snapshot = store.toSnapshot();
-    this.applyInventorySnapshot(player, snapshot);
+    this.applyInventorySnapshot(player, result.inventory);
     this.persistPlayerProgression(player);
     if (socket) {
       this.send(socket, {
         type: 'CRAFT_COMPLETED',
         requestId: pending.requestId,
         recipeId: result.recipe.id,
-        inventory: snapshot,
+        inventory: result.inventory,
       });
     }
   }
