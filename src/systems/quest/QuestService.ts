@@ -1,3 +1,4 @@
+import type { BuildPartId } from '../building/BuildingTypes';
 import { QUEST_DEFINITIONS, getQuestDefinition } from './QuestDefinitions';
 import type { PlayerQuestState, QuestId, QuestStateSnapshot } from './QuestTypes';
 
@@ -55,11 +56,27 @@ export class QuestService {
 
       for (const objective of quest.objectives) {
         if (objective.type !== 'collect_item' || objective.itemId !== itemId) continue;
-        const key = getObjectiveKey(quest.id, objective.id);
-        const previous = state.objectiveProgress[key] ?? 0;
-        const next = Math.min(objective.required, previous + amount);
-        if (next !== previous) {
-          state.objectiveProgress[key] = next;
+        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) this.completeFinishedQuests(state);
+    return changed;
+  }
+
+  grantPlacedBuildPart(state: PlayerQuestState, partId: BuildPartId, amount = 1): boolean {
+    if (amount <= 0) return false;
+    let changed = false;
+
+    for (const questId of state.activeQuestIds) {
+      const quest = getQuestDefinition(questId);
+      if (!quest) continue;
+
+      for (const objective of quest.objectives) {
+        if (objective.type !== 'place_build_part' || objective.partId !== partId) continue;
+        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
           changed = true;
         }
       }
@@ -97,6 +114,21 @@ export class QuestService {
     };
   }
 
+  private advanceObjective(
+    state: PlayerQuestState,
+    questId: QuestId,
+    objectiveId: string,
+    required: number,
+    amount: number,
+  ): boolean {
+    const key = getObjectiveKey(questId, objectiveId);
+    const previous = state.objectiveProgress[key] ?? 0;
+    const next = Math.min(required, previous + amount);
+    if (next === previous) return false;
+    state.objectiveProgress[key] = next;
+    return true;
+  }
+
   private completeFinishedQuests(state: PlayerQuestState): void {
     for (const questId of [...state.activeQuestIds]) {
       const quest = getQuestDefinition(questId);
@@ -108,6 +140,9 @@ export class QuestService {
       if (!done) continue;
       state.activeQuestIds = state.activeQuestIds.filter((id) => id !== questId);
       if (!state.completedQuestIds.includes(questId)) state.completedQuestIds.push(questId);
+      if (quest.nextQuestId && !state.completedQuestIds.includes(quest.nextQuestId) && !state.activeQuestIds.includes(quest.nextQuestId)) {
+        state.activeQuestIds.push(quest.nextQuestId);
+      }
     }
   }
 }
