@@ -2,6 +2,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import type {
   Facing,
   Inventory,
+  ItemType,
   MonsterType,
   MovementKeys,
   PlayerSnapshot,
@@ -62,6 +63,9 @@ export type ResourceEntity = {
   sourceRect?: WorldMapSourceRect;
   hp: number;
   maxHp: number;
+  drop: ItemType;
+  dropAmount: number;
+  respawnMs: number;
   /** 0 = alive, otherwise epoch ms when it respawns */
   respawnAt: number;
 };
