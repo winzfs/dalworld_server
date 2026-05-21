@@ -1,6 +1,6 @@
 # DalWorld Server Architecture Guide
 
-Last updated: 2026-05-20
+Last updated: 2026-05-21
 
 이 문서는 DalWorld 서버의 전체 구조를 설명한다.
 AI 작업자는 새 기능을 추가하기 전에 이 문서를 기준으로 어느 계층을 수정해야 하는지 판단한다.
@@ -22,6 +22,7 @@ AI 작업자는 새 기능을 추가하기 전에 이 문서를 기준으로 어
 - 몬스터 AI
 - 전투 판정
 - 월드맵 저장/조회
+- 맵 에디터 탭별 저장 데이터 반영
 - snapshot/event broadcast
 - Durable Object storage 저장
 
@@ -49,10 +50,20 @@ Client WebSocket message
 월드맵 저장 흐름:
 
 ```txt
-Client map editor
-  -> /maps/default or /maps/default/cell
-  -> GameRoom Durable Object
-  -> Durable Object storage
+Client map editor Tiles tab
+  -> /maps/default/cell
+  -> /maps/default/manifest
+  -> GameRoom Durable Object storage
+  -> runtime map reload
+
+Client map editor Monsters tab
+  -> /maps/default/monsters
+  -> GameRoom Durable Object storage
+  -> runtime map reload
+
+Client map editor Items tab
+  -> /maps/default/items
+  -> GameRoom Durable Object storage
   -> runtime map reload
 ```
 
@@ -91,6 +102,7 @@ WebSocket 세션, 메시지 라우팅, tick loop, snapshot/event 전송, storage
 - `src/systems/crafting/*`
 
 아이템 수량, 인벤토리 snapshot, 제작 검증을 담당한다.
+월드맵 Items 탭에서 저장된 `itemOverrides`는 `src/systems/inventory/RuntimeItemOverrides.ts`를 통해 필요한 서버 판정에 안전하게 조회한다.
 
 ### 3.6 World map
 
@@ -160,9 +172,10 @@ BUILD_PLACE_REQUEST
 
 현재 사용하는 저장 개념:
 
-- 월드맵 저장
-- 월드맵 manifest 저장
-- 월드맵 cell 저장
+- 월드맵 manifest 저장: `world:default-map:manifest`
+- 월드맵 cell 저장: `world:default-map:cell:<gridX>:<gridY>`
+- 월드맵 몬스터 설정 저장: `world:default-map:monsters`
+- 월드맵 아이템 override 저장: `world:default-map:items`
 - 건설 snapshot 저장
 
 저장 구조 변경 시 고려할 것:
@@ -174,6 +187,25 @@ BUILD_PLACE_REQUEST
 - 저장 실패 처리
 - 대형 데이터 chunking
 
+### 맵 에디터 탭별 저장 원칙
+
+맵 에디터 데이터는 실패 범위를 줄이기 위해 탭별로 저장한다.
+
+```txt
+Tiles 저장
+  -> 셀 payload는 /maps/default/cell로 분리 저장
+  -> name/tileSize/cellSize/cells 목차는 /maps/default/manifest로 저장
+
+Monsters 저장
+  -> monsterSpawnRules 배열만 /maps/default/monsters로 저장
+
+Items 저장
+  -> itemOverrides 배열만 /maps/default/items로 저장
+```
+
+`GET /maps/default`는 위 저장소를 조합해 완성된 `GameWorldMap`을 반환한다.
+각 저장 요청은 완료 후 `loadWorldMapFromStorage()`와 `setWorldMap()`을 호출해 Durable Object 런타임의 자원/몬스터 시드와 item override 기반 판정에 즉시 반영한다.
+
 ## 8. 월드맵 원칙
 
 월드맵은 대형 맵 확장을 고려해 셀 기반으로 관리한다.
@@ -183,6 +215,7 @@ BUILD_PLACE_REQUEST
 - 대형 맵을 단일 JSON으로만 의존
 - 셀 좌표 검증 없이 저장
 - compact format 호환성 무시
+- 몬스터/아이템 설정을 매번 대형 맵 payload에 함께 묶어 저장
 
 ## 9. 건설 시스템 원칙
 
