@@ -195,6 +195,7 @@ export class MonsterSystem {
     if (nowMs < monster.nextAttackAt) return;
 
     monster.nextAttackAt = nowMs + monster.attackCooldownMs;
+    monster.attackSeq += 1;
 
     const damage = monster.attackDamage;
     target.hp = Math.max(0, target.hp - damage);
@@ -378,6 +379,7 @@ export class MonsterSystem {
       attackDamage,
       attackCooldownMs,
       nextAttackAt: 0,
+      attackSeq: 0,
       spawnRegionId,
       spawnRuleId,
     };
