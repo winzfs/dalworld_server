@@ -17,6 +17,12 @@ export async function handleAuthRequest(request: Request, env: Env): Promise<Res
     return Response.json(result, { status: result.ok ? 200 : 401 });
   }
 
+  if (url.pathname === '/auth/logout' && request.method === 'POST') {
+    const body = await readJsonBody<{ sessionToken?: unknown }>(request);
+    await auth.logout(String(body.sessionToken ?? ''));
+    return Response.json({ ok: true });
+  }
+
   if (url.pathname === '/auth/me' && request.method === 'POST') {
     const body = await readJsonBody<{ sessionToken?: unknown }>(request);
     const profile = await auth.getProfile(String(body.sessionToken ?? ''));
