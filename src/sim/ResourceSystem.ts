@@ -1,5 +1,6 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
+import { getWorldItemNumberField } from '../systems/inventory/RuntimeItemOverrides';
 import { shortId } from '../utils/ids';
 import { randomRange } from '../utils/math';
 import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
@@ -58,7 +59,7 @@ export class ResourceSystem {
 
     for (const cell of map.cells) {
       for (const placement of cell.placements) {
-        const resource = this.createFromPlacement(cell.gridX, cell.gridY, placement);
+        const resource = this.createFromPlacement(cell.gridX, cell.gridY, placement, map);
         if (resource) {
           world.resources.set(resource.id, resource);
         }
@@ -69,8 +70,7 @@ export class ResourceSystem {
   update(world: WorldState, nowMs: number): void {
     for (const resource of world.resources.values()) {
       if (resource.respawnAt !== 0 && nowMs >= resource.respawnAt) {
-        const template = TEMPLATES[resource.type];
-        resource.hp = template.maxHp;
+        resource.hp = resource.maxHp;
         resource.respawnAt = 0;
       }
     }
@@ -114,9 +114,8 @@ export class ResourceSystem {
     resource.hp = Math.max(0, resource.hp - GATHER_DAMAGE);
 
     if (resource.hp <= 0) {
-      const template = TEMPLATES[resource.type];
-      resource.respawnAt = nowMs + template.respawnMs;
-      player.inventory[template.drop] += template.dropAmount;
+      resource.respawnAt = nowMs + resource.respawnMs;
+      player.inventory[resource.drop] += resource.dropAmount;
       world.pushEvent({
         type: 'resource_destroyed',
         resourceId: resource.id,
@@ -125,8 +124,8 @@ export class ResourceSystem {
       world.pushEvent({
         type: 'item_gained',
         playerId: player.id,
-        item: template.drop,
-        amount: template.dropAmount,
+        item: resource.drop,
+        amount: resource.dropAmount,
       });
       return { ok: true, destroyed: true, resource };
     }
@@ -140,14 +139,29 @@ export class ResourceSystem {
     return { ok: true, destroyed: false, resource };
   }
 
-  private createFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement): ResourceEntity | null {
+  private createFromPlacement(cellX: number, cellY: number, placement: WorldMapPlacement, map: GameWorldMap): ResourceEntity | null {
     const type = getPlacementResourceType(placement);
     if (!type) return null;
 
     const template = TEMPLATES[type];
     if (!template) return null;
 
-    const maxHp = normalizePositiveNumber(placement.gameplay?.maxHp, template.maxHp);
+    const drop = template.drop;
+    const maxHp = Math.floor(getWorldItemNumberField(
+      map,
+      drop,
+      'nodeHp',
+      normalizePositiveNumber(placement.gameplay?.maxHp, template.maxHp),
+      { min: 1, max: 99_999 },
+    ));
+    const dropAmount = Math.floor(getWorldItemNumberField(map, drop, 'gatherYield', template.dropAmount, { min: 1, max: 999 }));
+    const respawnMs = Math.floor(getWorldItemNumberField(
+      map,
+      drop,
+      'respawnMs',
+      normalizePositiveNumber(placement.gameplay?.respawnMs, template.respawnMs),
+      { min: 1_000, max: 3_600_000 },
+    ));
     const scale = normalizePositiveNumber(placement.scale, 1);
     const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
@@ -169,6 +183,9 @@ export class ResourceSystem {
       y: interactionPoint.y,
       hp: maxHp,
       maxHp,
+      drop,
+      dropAmount,
+      respawnMs,
       respawnAt: 0,
     };
   }
@@ -185,6 +202,9 @@ export class ResourceSystem {
       y: pos.y,
       hp: template.maxHp,
       maxHp: template.maxHp,
+      drop: template.drop,
+      dropAmount: template.dropAmount,
+      respawnMs: template.respawnMs,
       respawnAt: 0,
     };
   }
