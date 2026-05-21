@@ -19,6 +19,7 @@ import { CombatService } from '../systems/combat/CombatService';
 import { CraftingService } from '../systems/crafting/CraftingService';
 import { getCraftingRecipe } from '../systems/crafting/CraftingRecipes';
 import { InventoryService } from '../systems/inventory/InventoryService';
+import { getFastestCraftSpeedMultiplierForPlayerInventory } from '../systems/inventory/RuntimeItemOverrides';
 import { InventoryStore, type InventorySnapshot } from '../systems/inventory/InventoryStore';
 import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
 import { PlayerProgressionStore } from '../systems/player/PlayerProgressionStore';
@@ -500,7 +501,12 @@ export class GameRoom extends DurableObject<Env> {
       updatedAt: started.inventory.updatedAt,
     });
 
-    const craftingMs = Math.max(MIN_CRAFTING_DURATION_MS, Math.floor((recipe.craftSeconds ?? 0) * 1000));
+    const craftSpeedMultiplier = getFastestCraftSpeedMultiplierForPlayerInventory(
+      this.worldMap,
+      player.inventoryItems.filter((item) => item.quantity > 0).map((item) => item.itemId),
+    );
+    const baseCraftingMs = Math.floor((recipe.craftSeconds ?? 0) * 1000);
+    const craftingMs = Math.max(MIN_CRAFTING_DURATION_MS, Math.floor(baseCraftingMs / craftSpeedMultiplier));
     const startsAt = Date.now();
     const completesAt = startsAt + craftingMs;
 
