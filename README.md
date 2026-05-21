@@ -57,10 +57,30 @@ npm run deploy     # wrangler deploy
 |------|------|
 | `GET /health` | 서버 상태 확인 |
 | `GET /ws` | WebSocket 접속 |
-| `GET /maps/default` | 기본 월드맵 조회 |
-| `PUT /maps/default` | 기본 월드맵 저장 |
-| `PUT /maps/default/cell` | 셀 단위 월드맵 저장 |
-| `PUT /maps/default/manifest` | 월드맵 매니페스트 저장 |
+| `GET /maps/default` | 기본 월드맵 조회. 서버가 map cells + monster rules + item overrides를 조합해 반환 |
+| `PUT /maps/default` | 호환용 기본 월드맵 저장. 내부적으로 셀/매니페스트/분리 저장소에 저장 |
+| `PUT /maps/default/cell?gridX=&gridY=` | 셀 단위 월드맵 저장. 저장 후 런타임 월드맵 즉시 재로딩 |
+| `PUT /maps/default/manifest` | 월드맵 매니페스트 저장. `name`, `tileSize`, `cellSize`, `cells` 목차 중심 |
+| `PUT /maps/default/monsters` | 맵 에디터 Monsters 탭 전용 저장. `monsterSpawnRules`만 저장하고 즉시 런타임 반영 |
+| `PUT /maps/default/items` | 맵 에디터 Items 탭 전용 저장. `itemOverrides`만 저장하고 즉시 런타임 반영 |
+
+### 월드맵 에디터 저장 정책
+
+월드맵 에디터는 payload 실패 범위를 줄이기 위해 탭별 저장을 사용한다.
+
+```txt
+Tiles 저장
+  -> /maps/default/cell
+  -> /maps/default/manifest
+
+Monsters 저장
+  -> /maps/default/monsters
+
+Items 저장
+  -> /maps/default/items
+```
+
+`GET /maps/default`는 Durable Object storage에 분리 저장된 셀, 몬스터 스폰 규칙, 아이템 override를 조합해 클라이언트에 내려준다. 각 PUT 저장은 완료 후 `GameRoom`의 런타임 월드맵을 다시 로딩해 현재 방에 즉시 반영한다.
 
 ## WebSocket endpoint
 
@@ -141,6 +161,13 @@ src/
 - 서버가 `BUILD_REJECTED`를 보내는지 확인
 - `BUILD_SNAPSHOT`이 접속 시 전송되는지 확인
 - 건설 snapshot이 Durable Object storage에 저장되는지 확인
+
+**에디터 저장이 실패함:**
+
+- Tiles/Monsters/Items 중 어떤 탭 저장이 실패했는지 먼저 확인한다.
+- Tiles 저장 실패는 셀 payload 또는 manifest를 확인한다.
+- Monsters 저장 실패는 `/maps/default/monsters` payload가 배열인지 확인한다.
+- Items 저장 실패는 `/maps/default/items` payload가 배열인지 확인한다.
 
 ## 기능 추가 시 체크리스트
 
