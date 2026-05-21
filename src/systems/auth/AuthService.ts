@@ -17,6 +17,11 @@ export type AuthUserProfile = {
   character: AuthCharacter | null;
 };
 
+export type VerifiedGameSession = {
+  accountId: string;
+  character: AuthCharacter;
+};
+
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const PBKDF2_ITERATIONS = 100_000;
 const PASSWORD_KEY_BITS = 256;
@@ -135,6 +140,16 @@ export class AuthService {
     };
   }
 
+  async verifyGameSession(token: string): Promise<VerifiedGameSession | null> {
+    const session = await this.verifySession(token);
+    if (!session) return null;
+    const character = session.characterId
+      ? await this.getCharacterById(session.characterId)
+      : await this.getCharacterByAccountId(session.accountId);
+    if (!character || character.accountId !== session.accountId) return null;
+    return { accountId: session.accountId, character };
+  }
+
   async verifySession(token: string): Promise<AuthSession | null> {
     if (!isValidToken(token)) return null;
     const row = await this.db
@@ -155,6 +170,15 @@ export class AuthService {
     const row = await this.db
       .prepare(`SELECT id, account_id, name FROM characters WHERE account_id = ?`)
       .bind(accountId)
+      .first<{ id: string; account_id: string; name: string }>();
+    if (!row) return null;
+    return { id: row.id, accountId: row.account_id, name: row.name };
+  }
+
+  async getCharacterById(characterId: string): Promise<AuthCharacter | null> {
+    const row = await this.db
+      .prepare(`SELECT id, account_id, name FROM characters WHERE id = ?`)
+      .bind(characterId)
       .first<{ id: string; account_id: string; name: string }>();
     if (!row) return null;
     return { id: row.id, accountId: row.account_id, name: row.name };
