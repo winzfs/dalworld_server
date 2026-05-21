@@ -1,6 +1,7 @@
 import type { BuildingServerEvent, BuildDoorToggleRequest, BuildPlaceRequest, BuildRemoveRequest, BuildUpdateRequest } from '../systems/building/BuildingTypes';
 import type { CraftingRecipeId } from '../systems/crafting/CraftingTypes';
 import type { InventoryItemId, InventoryItemStack, InventorySnapshot } from '../systems/inventory/InventoryStore';
+import type { QuestStateSnapshot } from '../systems/quest/QuestTypes';
 import type { GameWorldMap, WorldMapSourceRect } from '../worldMap/types';
 
 export type MovementKeys = {
@@ -46,6 +47,7 @@ export type PlayerSnapshot = {
   lastInputSeq: number;
   inventory: Inventory;
   inventoryItems?: InventoryItemStack[];
+  questState?: QuestStateSnapshot;
   alive: boolean;
   respawnAt: number;
 };
