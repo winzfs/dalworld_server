@@ -561,6 +561,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     this.applyInventorySnapshot(player, result.inventory);
+    new QuestService().grantCraftedRecipe(player.questState, result.recipe.id, 1);
     this.persistPlayerProgression(player);
     if (socket) {
       this.send(socket, {
