@@ -11,6 +11,8 @@ import type {
   ServerEvent,
 } from '../protocol/messages';
 import type { InventoryItemStack } from '../systems/inventory/InventoryStore';
+import { createInitialQuestState, QuestService } from '../systems/quest/QuestService';
+import type { PlayerQuestState } from '../systems/quest/QuestTypes';
 import type { WorldMapMonsterSpecOverrides, WorldMapSourceRect } from '../worldMap/types';
 
 export const WORLD_WIDTH = GAME_CONFIG.world.width;
@@ -38,6 +40,7 @@ export type PlayerEntity = {
   inventory: Inventory;
   /** Generic inventory stacks used by crafting/building/item systems. */
   inventoryItems: InventoryItemStack[];
+  questState: PlayerQuestState;
   input: MovementKeys;
   /** epoch ms when next gather is allowed */
   nextGatherAt: number;
@@ -140,6 +143,7 @@ export class WorldState {
   }
 
   toPlayerSnapshots(): PlayerSnapshot[] {
+    const quests = new QuestService();
     return [...this.players.values()].map((p) => ({
       id: p.id,
       characterName: p.characterName,
@@ -158,6 +162,7 @@ export class WorldState {
       lastInputSeq: p.lastInputSeq,
       inventory: { ...p.inventory },
       inventoryItems: p.inventoryItems.map((item) => ({ ...item })),
+      questState: quests.toSnapshot(p.questState ?? createInitialQuestState()),
       alive: p.respawnAt === 0,
       respawnAt: p.respawnAt,
     }));
