@@ -4,7 +4,8 @@ import type { CraftingRecipeId } from '../crafting/CraftingTypes';
 export type QuestId =
   | 'chapter1.awakened_survivor'
   | 'chapter1.first_workbench'
-  | 'chapter1.first_crafting';
+  | 'chapter1.first_crafting'
+  | 'chapter1.small_base';
 
 export type QuestObjectiveType = 'collect_item' | 'place_build_part' | 'craft_recipe';
 
