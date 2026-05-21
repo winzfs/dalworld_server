@@ -4,6 +4,31 @@ export type WorldMapLayerId = 'ground' | 'object' | 'collision';
 
 export type WorldMapResourceType = 'tree' | 'stone';
 
+export type WorldMapItemCategory =
+  | 'resource'
+  | 'consumable'
+  | 'equipment'
+  | 'weapon'
+  | 'tool'
+  | 'crafting_material'
+  | 'crafting_station'
+  | 'building_part'
+  | 'capture'
+  | 'pet';
+
+export type WorldMapItemFieldValue = string | number | boolean;
+
+export type WorldMapItemOverride = {
+  id: string;
+  label?: string;
+  description?: string;
+  icon?: string;
+  category?: WorldMapItemCategory;
+  stackable?: boolean;
+  maxStack?: number;
+  fields?: Record<string, WorldMapItemFieldValue>;
+};
+
 export type WorldMapMonsterSpecOverrides = {
   maxHp?: number;
   moveSpeed?: number;
@@ -83,4 +108,5 @@ export type GameWorldMap = {
   cellSize: number;
   cells: WorldMapCell[];
   monsterSpawnRules?: WorldMapMonsterSpawnRule[];
+  itemOverrides?: WorldMapItemOverride[];
 };
