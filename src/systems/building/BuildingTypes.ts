@@ -53,7 +53,8 @@ export type BuildPartId =
   | "door"
   | "stone_door"
   | "window"
-  | "wide_window";
+  | "wide_window"
+  | "station_workbench";
 
 export type BuildCategory =
   | "floor"
@@ -61,7 +62,8 @@ export type BuildCategory =
   | "support"
   | "roof"
   | "door"
-  | "window";
+  | "window"
+  | "station";
 
 export type BuildSlotKind = "tile" | "edge" | "corner";
 export type BuildEdge = "north" | "east" | "south" | "west";
