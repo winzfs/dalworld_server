@@ -1,5 +1,6 @@
 import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
+import type { InventoryItemId } from '../systems/inventory/InventoryStore';
 import { getWorldItemNumberField } from '../systems/inventory/RuntimeItemOverrides';
 import { shortId } from '../utils/ids';
 import { randomRange } from '../utils/math';
@@ -116,6 +117,7 @@ export class ResourceSystem {
     if (resource.hp <= 0) {
       resource.respawnAt = nowMs + resource.respawnMs;
       player.inventory[resource.drop] += resource.dropAmount;
+      addPlayerInventoryStack(player, resource.drop, resource.dropAmount);
       world.pushEvent({
         type: 'resource_destroyed',
         resourceId: resource.id,
@@ -313,6 +315,16 @@ function getPlacementResourceType(placement: WorldMapPlacement): ResourceType | 
   if (filename.startsWith('stone')) return 'stone';
   if (filename.startsWith('tree')) return 'tree';
   return null;
+}
+
+function addPlayerInventoryStack(player: PlayerEntity, itemId: InventoryItemId, quantity: number): void {
+  const existing = player.inventoryItems.find((stack) => stack.itemId === itemId);
+  if (existing) {
+    existing.quantity += quantity;
+    return;
+  }
+
+  player.inventoryItems.push({ itemId, quantity });
 }
 
 function getFilename(url: string): string {
