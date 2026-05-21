@@ -1,11 +1,14 @@
-export type QuestId = 'chapter1.awakened_survivor';
+import type { BuildPartId } from '../building/BuildingTypes';
 
-export type QuestObjectiveType = 'collect_item';
+export type QuestId = 'chapter1.awakened_survivor' | 'chapter1.first_workbench';
+
+export type QuestObjectiveType = 'collect_item' | 'place_build_part';
 
 export type QuestObjectiveDefinition = {
   id: string;
   type: QuestObjectiveType;
-  itemId: string;
+  itemId?: string;
+  partId?: BuildPartId;
   required: number;
   label: string;
 };
@@ -16,6 +19,7 @@ export type QuestDefinition = {
   title: string;
   description: string;
   objectives: QuestObjectiveDefinition[];
+  nextQuestId?: QuestId;
 };
 
 export type QuestObjectiveProgress = {
