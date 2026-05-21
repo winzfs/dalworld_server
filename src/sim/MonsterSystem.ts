@@ -74,7 +74,7 @@ export class MonsterSystem {
         monsterType: rule.monsterType,
         scope: rule.scope,
         maxAlive: Math.max(0, Math.min(500, Math.floor(normalizePositiveNumber(rule.maxAlive, 0)))),
-        spawnsPerHour: Math.max(1, normalizePositiveNumber(rule.spawnsPerHour, 60)),
+        spawnsPerMinute: Math.max(1, normalizeSpawnsPerMinute(rule.spawnsPerMinute, rule.spawnsPerHour, 1)),
         nextSpawnAt: Date.now(),
         spec: rule.spec ? { ...rule.spec } : undefined,
       });
@@ -88,7 +88,7 @@ export class MonsterSystem {
     world.monsterSpawnRules.clear();
 
     for (const region of regions) {
-      region.nextSpawnAt = nowMs + spawnIntervalMs(region.spawnsPerHour);
+      region.nextSpawnAt = nowMs + spawnIntervalMs(region.spawnsPerMinute);
       world.monsterSpawnRegions.set(region.id, region);
       for (let i = 0; i < region.maxAlive; i += 1) {
         const monster = this.trySpawnFromRegion(world, region, i);
@@ -97,10 +97,9 @@ export class MonsterSystem {
     }
 
     for (const rule of rules) {
-      rule.nextSpawnAt = nowMs + spawnIntervalMs(rule.spawnsPerHour);
+      rule.nextSpawnAt = nowMs + spawnIntervalMs(rule.spawnsPerMinute);
       world.monsterSpawnRules.set(rule.id, rule);
-      const initialCount = Math.min(rule.maxAlive, Math.ceil(rule.spawnsPerHour / 12));
-      for (let i = 0; i < initialCount; i += 1) {
+      for (let i = 0; i < rule.maxAlive; i += 1) {
         const monster = this.trySpawnFromWorldRule(world, rule, nowMs + i);
         if (monster) world.monsters.set(monster.id, monster);
       }
@@ -127,7 +126,7 @@ export class MonsterSystem {
 
       const monster = this.trySpawnFromRegion(world, region, nowMs, buildingGrid);
       if (monster) world.monsters.set(monster.id, monster);
-      region.nextSpawnAt = nowMs + spawnIntervalMs(region.spawnsPerHour);
+      region.nextSpawnAt = nowMs + spawnIntervalMs(region.spawnsPerMinute);
     }
   }
 
@@ -141,7 +140,7 @@ export class MonsterSystem {
 
       const monster = this.trySpawnFromWorldRule(world, rule, nowMs, buildingGrid);
       if (monster) world.monsters.set(monster.id, monster);
-      rule.nextSpawnAt = nowMs + spawnIntervalMs(rule.spawnsPerHour);
+      rule.nextSpawnAt = nowMs + spawnIntervalMs(rule.spawnsPerMinute);
     }
   }
 
@@ -278,7 +277,7 @@ export class MonsterSystem {
     const spawnRadius = normalizePositiveNumber(placement.gameplay.spawnRadius, 160);
     const maxAlive = Math.max(1, Math.min(50, Math.floor(normalizePositiveNumber(placement.gameplay.maxAlive, 1))));
     const respawnMs = Math.max(1_000, Math.floor(normalizePositiveNumber(placement.gameplay.respawnMs, 30_000)));
-    const spawnsPerHour = normalizePositiveNumber(placement.gameplay.spawnsPerHour, 3_600_000 / respawnMs);
+    const spawnsPerMinute = normalizeSpawnsPerMinute(placement.gameplay.spawnsPerMinute, placement.gameplay.spawnsPerHour, 60_000 / respawnMs);
     const scale = normalizePositiveNumber(placement.scale, 1);
     const displayWidth = normalizePositiveNumber(placement.displayWidth ?? placement.sourceRect?.width, 32);
     const displayHeight = normalizePositiveNumber(placement.displayHeight ?? placement.sourceRect?.height, 32);
@@ -293,7 +292,7 @@ export class MonsterSystem {
       radius: spawnRadius,
       maxAlive,
       respawnMs,
-      spawnsPerHour,
+      spawnsPerMinute,
       nextSpawnAt: 0,
       spec: placement.gameplay.spec ? { ...placement.gameplay.spec } : undefined,
     };
@@ -411,8 +410,20 @@ function countRuleMonsters(world: WorldState, ruleId: string): number {
   return count;
 }
 
-function spawnIntervalMs(spawnsPerHour: number): number {
-  return Math.max(1_000, Math.floor(3_600_000 / Math.max(1, spawnsPerHour)));
+function spawnIntervalMs(spawnsPerMinute: number): number {
+  return Math.max(1_000, Math.floor(60_000 / Math.max(1, spawnsPerMinute)));
+}
+
+function normalizeSpawnsPerMinute(
+  spawnsPerMinute: number | undefined,
+  legacySpawnsPerHour: number | undefined,
+  fallback: number,
+): number {
+  if (Number.isFinite(spawnsPerMinute) && (spawnsPerMinute as number) > 0) return spawnsPerMinute as number;
+  if (Number.isFinite(legacySpawnsPerHour) && (legacySpawnsPerHour as number) > 0) {
+    return Math.max(1, (legacySpawnsPerHour as number) / 60);
+  }
+  return Math.max(1, fallback);
 }
 
 function getWorldMinX(_map: GameWorldMap | null): number {
