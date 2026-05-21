@@ -55,6 +55,7 @@ export class GameSimulation {
       hp: m.hp,
       maxHp: m.maxHp,
       state: m.state,
+      facing: m.facing,
       targetPlayerId: m.targetPlayerId,
       attackCooldownMs: m.attackCooldownMs,
       attackSeq: m.attackSeq,
