@@ -57,6 +57,7 @@ export class GameSimulation {
       state: m.state,
       targetPlayerId: m.targetPlayerId,
       attackCooldownMs: m.attackCooldownMs,
+      attackSeq: m.attackSeq,
     }));
 
     return {
