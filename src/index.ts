@@ -1,5 +1,6 @@
 import type { Env } from './env';
 import { GameRoom } from './rooms/GameRoom';
+import { handleHttpRoutes } from './httpRoutes';
 
 export { GameRoom };
 
@@ -17,11 +18,14 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname === MAP_ENDPOINT_PREFIX || url.pathname.startsWith(`${MAP_ENDPOINT_PREFIX}/`)) {
-      if (request.method === 'OPTIONS') {
-        return new Response(null, { status: 204, headers: CORS_HEADERS });
-      }
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
 
+    const httpRouteResponse = await handleHttpRoutes(request, env);
+    if (httpRouteResponse) return withCors(httpRouteResponse);
+
+    if (url.pathname === MAP_ENDPOINT_PREFIX || url.pathname.startsWith(`${MAP_ENDPOINT_PREFIX}/`)) {
       const id = env.GAME_ROOM.idFromName('main-world');
       const room = env.GAME_ROOM.get(id);
 
