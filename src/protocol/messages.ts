@@ -76,6 +76,7 @@ export type MonsterSnapshot = {
   hp: number;
   maxHp: number;
   state: MonsterStateName;
+  facing?: Facing;
   targetPlayerId: string | null;
   attackCooldownMs?: number;
   /** Increments only when the server actually applies a monster attack. */
@@ -99,7 +100,7 @@ export type PublicGameConfig = {
   gameplay: PublicGameplayConfig;
 };
 
-export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildDoorToggleRequest;
+export type BuildingClientMessage = BuildPlaceRequest | BuildUpdateRequest | BuildRemoveRequest | BuildUpdateRequest | BuildDoorToggleRequest;
 
 export type CraftingClientMessage = {
   type: 'CRAFT_REQUEST';
