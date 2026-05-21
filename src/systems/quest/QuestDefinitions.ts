@@ -45,6 +45,7 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
     chapter: 'Chapter 1. 잃어버린 캠프',
     title: '첫 제작',
     description: '작업대를 기반으로 초반 건설에 필요한 재료를 직접 제작하세요.',
+    nextQuestId: 'chapter1.small_base',
     objectives: [
       {
         id: 'craft_plank',
@@ -59,6 +60,28 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
         recipeId: 'craft:stone_block',
         required: 2,
         label: '석재 블록 2회 제작',
+      },
+    ],
+  },
+  {
+    id: 'chapter1.small_base',
+    chapter: 'Chapter 1. 잃어버린 캠프',
+    title: '작은 거점',
+    description: '바닥과 벽을 세워 비바람을 피할 첫 거점을 만드세요.',
+    objectives: [
+      {
+        id: 'place_floor',
+        type: 'place_build_part',
+        partId: 'floor_1x1',
+        required: 4,
+        label: '나무 바닥 4개 설치',
+      },
+      {
+        id: 'place_wall',
+        type: 'place_build_part',
+        partId: 'thin_wall',
+        required: 4,
+        label: '나무 벽 4개 설치',
       },
     ],
   },
