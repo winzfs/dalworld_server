@@ -128,6 +128,7 @@ export class QuestService {
             id: quest.id,
             title: quest.title,
             description: quest.description,
+            cinematic: quest.cinematic,
             completed: objectives.every((objective) => objective.completed),
             objectives,
           };
