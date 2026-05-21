@@ -2,6 +2,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import type { ItemType, ResourceType } from '../protocol/messages';
 import type { InventoryItemId } from '../systems/inventory/InventoryStore';
 import { getWorldItemNumberField } from '../systems/inventory/RuntimeItemOverrides';
+import { QuestService } from '../systems/quest/QuestService';
 import { shortId } from '../utils/ids';
 import { randomRange } from '../utils/math';
 import type { GameWorldMap, WorldMapPlacement } from '../worldMap/types';
@@ -118,6 +119,7 @@ export class ResourceSystem {
       resource.respawnAt = nowMs + resource.respawnMs;
       player.inventory[resource.drop] += resource.dropAmount;
       addPlayerInventoryStack(player, resource.drop, resource.dropAmount);
+      new QuestService().grantCollectedItem(player.questState, resource.drop, resource.dropAmount);
       world.pushEvent({
         type: 'resource_destroyed',
         resourceId: resource.id,
