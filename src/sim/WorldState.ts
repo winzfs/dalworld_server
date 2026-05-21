@@ -96,7 +96,7 @@ export type MonsterSpawnRegionEntity = {
   radius: number;
   maxAlive: number;
   respawnMs: number;
-  spawnsPerHour: number;
+  spawnsPerMinute: number;
   nextSpawnAt: number;
   spec?: WorldMapMonsterSpecOverrides;
 };
@@ -106,7 +106,7 @@ export type MonsterSpawnRuleEntity = {
   monsterType: MonsterType;
   scope: 'world' | 'region';
   maxAlive: number;
-  spawnsPerHour: number;
+  spawnsPerMinute: number;
   nextSpawnAt: number;
   spec?: WorldMapMonsterSpecOverrides;
 };
