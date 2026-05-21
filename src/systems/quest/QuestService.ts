@@ -1,4 +1,5 @@
 import type { BuildPartId } from '../building/BuildingTypes';
+import type { CraftingRecipeId } from '../crafting/CraftingTypes';
 import { QUEST_DEFINITIONS, getQuestDefinition } from './QuestDefinitions';
 import type { PlayerQuestState, QuestId, QuestStateSnapshot } from './QuestTypes';
 
@@ -76,6 +77,26 @@ export class QuestService {
 
       for (const objective of quest.objectives) {
         if (objective.type !== 'place_build_part' || objective.partId !== partId) continue;
+        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) this.completeFinishedQuests(state);
+    return changed;
+  }
+
+  grantCraftedRecipe(state: PlayerQuestState, recipeId: CraftingRecipeId, amount = 1): boolean {
+    if (amount <= 0) return false;
+    let changed = false;
+
+    for (const questId of state.activeQuestIds) {
+      const quest = getQuestDefinition(questId);
+      if (!quest) continue;
+
+      for (const objective of quest.objectives) {
+        if (objective.type !== 'craft_recipe' || objective.recipeId !== recipeId) continue;
         if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
           changed = true;
         }
