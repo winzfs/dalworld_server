@@ -39,7 +39,7 @@ export async function handleAuthRequest(request: Request, env: Env): Promise<Res
 
 async function readJsonBody<T>(request: Request): Promise<T> {
   try {
-    return await request.json<T>();
+    return await request.json() as T;
   } catch {
     return {} as T;
   }
