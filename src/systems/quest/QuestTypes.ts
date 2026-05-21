@@ -9,6 +9,12 @@ export type QuestId =
 
 export type QuestObjectiveType = 'collect_item' | 'place_build_part' | 'craft_recipe';
 
+export type QuestCinematicCue = {
+  introTitle: string;
+  introText: string;
+  cameraCue: 'wake' | 'focus' | 'build' | 'danger';
+};
+
 export type QuestObjectiveDefinition = {
   id: string;
   type: QuestObjectiveType;
@@ -24,6 +30,7 @@ export type QuestDefinition = {
   chapter: string;
   title: string;
   description: string;
+  cinematic?: QuestCinematicCue;
   objectives: QuestObjectiveDefinition[];
   nextQuestId?: QuestId;
 };
@@ -38,6 +45,7 @@ export type ActiveQuestSnapshot = {
   id: QuestId;
   title: string;
   description: string;
+  cinematic?: QuestCinematicCue;
   completed: boolean;
   objectives: Array<QuestObjectiveDefinition & QuestObjectiveProgress>;
 };
