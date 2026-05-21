@@ -2,6 +2,7 @@ import { GAME_CONFIG } from '../config/gameConfig';
 import type { Facing, MovementKeys } from '../protocol/messages';
 import type { BuildingGrid } from '../systems/building/BuildingGrid';
 import { getExpToNextLevel, getMaxHpForLevel, getMaxStaminaForLevel, sanitizeCharacterName } from '../systems/player/PlayerProgression';
+import { createInitialQuestState } from '../systems/quest/QuestService';
 import { clamp, normalize } from '../utils/math';
 import {
   WORLD_HEIGHT,
@@ -103,6 +104,7 @@ export function createPlayer(id: string, characterName?: string): PlayerEntity {
     lastInputSeq: 0,
     inventory: { wood: STARTER_BUILDING_WOOD, stone: STARTER_BUILDING_STONE },
     inventoryItems: TEST_STARTER_INVENTORY.map((stack) => ({ ...stack })),
+    questState: createInitialQuestState(),
     input: { up: false, down: false, left: false, right: false },
     nextGatherAt: 0,
     nextAttackAt: 0,
