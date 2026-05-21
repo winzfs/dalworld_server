@@ -121,6 +121,14 @@ export type CombatAttackRequest = {
   targetId?: string;
 };
 
+export type CraftingStartedEvent = {
+  type: 'CRAFT_STARTED';
+  requestId: string;
+  recipeId: CraftingRecipeId;
+  startsAt: number;
+  completesAt: number;
+};
+
 export type CraftingCompletedEvent = {
   type: 'CRAFT_COMPLETED';
   requestId: string;
@@ -134,7 +142,7 @@ export type CraftingRejectedEvent = {
   reason: string;
 };
 
-export type CraftingServerEvent = CraftingCompletedEvent | CraftingRejectedEvent;
+export type CraftingServerEvent = CraftingStartedEvent | CraftingCompletedEvent | CraftingRejectedEvent;
 
 export type CombatAttackConfirmedEvent = {
   type: 'COMBAT_ATTACK_CONFIRMED';
