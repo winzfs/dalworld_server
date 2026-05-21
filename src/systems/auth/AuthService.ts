@@ -84,6 +84,11 @@ export class AuthService {
     };
   }
 
+  async logout(token: string): Promise<void> {
+    if (!isValidToken(token)) return;
+    await this.db.prepare(`DELETE FROM auth_sessions WHERE token = ?`).bind(token).run();
+  }
+
   async getProfile(token: string): Promise<AuthUserProfile | null> {
     const session = await this.verifySession(token);
     if (!session) return null;
