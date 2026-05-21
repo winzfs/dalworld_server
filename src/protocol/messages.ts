@@ -78,6 +78,8 @@ export type MonsterSnapshot = {
   state: MonsterStateName;
   targetPlayerId: string | null;
   attackCooldownMs?: number;
+  /** Increments only when the server actually applies a monster attack. */
+  attackSeq?: number;
 };
 
 export type WorldInfo = {
