@@ -12,6 +12,7 @@ import { PROTOCOL_VERSION } from '../protocol/version';
 import { GameSimulation } from '../sim/GameSimulation';
 import { applyInput, createPlayer } from '../sim/PlayerSystem';
 import { PLAYER_RADIUS, WORLD_WIDTH, type PlayerEntity } from '../sim/WorldState';
+import { AuthService } from '../systems/auth/AuthService';
 import { BuildingGrid } from '../systems/building/BuildingGrid';
 import { BuildingService } from '../systems/building/BuildingService';
 import type { BuildingSnapshot } from '../systems/building/BuildingTypes';
@@ -137,15 +138,18 @@ export class GameRoom extends DurableObject<Env> {
 
     await this.loadBuildingsIfNeeded();
 
+    const identity = await this.resolvePlayerIdentity(url);
+    if (!identity) return new Response('Unauthorized game session', { status: 401 });
+
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
     server.accept();
 
-    const playerId = getStablePlayerId(url);
-    const player = createPlayer(playerId, url.searchParams.get('name') ?? undefined);
+    const player = createPlayer(identity.playerId, identity.characterName);
     await this.loadPlayerProgression(player);
-    this.sessions.set(server, playerId);
-    this.simulation.world.players.set(playerId, player);
+    setPlayerCharacterName(player, identity.characterName);
+    this.sessions.set(server, identity.playerId);
+    this.simulation.world.players.set(identity.playerId, player);
 
     const now = Date.now();
     const publicConfig = getPublicGameConfig();
@@ -157,7 +161,7 @@ export class GameRoom extends DurableObject<Env> {
     this.send(server, {
       type: 'welcome',
       protocolVersion: PROTOCOL_VERSION,
-      playerId,
+      playerId: identity.playerId,
       world: publicConfig.world,
       gameplay: publicConfig.gameplay,
       map: this.worldMap,
@@ -170,7 +174,7 @@ export class GameRoom extends DurableObject<Env> {
       snapshot: this.buildingGrid.toSnapshot(),
     });
 
-    this.simulation.world.pushEvent({ type: 'player_joined', playerId });
+    this.simulation.world.pushEvent({ type: 'player_joined', playerId: identity.playerId });
     this.ensureLoop();
 
     server.addEventListener('message', (event) => this.handleMessage(server, event.data));
@@ -178,6 +182,18 @@ export class GameRoom extends DurableObject<Env> {
     server.addEventListener('error', () => this.closeSession(server));
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  private async resolvePlayerIdentity(url: URL): Promise<{ playerId: string; characterName: string } | null> {
+    const sessionToken = url.searchParams.get('sessionToken');
+    if (sessionToken) {
+      const verified = await new AuthService(this.env.DB).verifyGameSession(sessionToken);
+      if (!verified) return null;
+      return { playerId: verified.character.id, characterName: verified.character.name };
+    }
+
+    const playerId = getStablePlayerId(url);
+    return { playerId, characterName: url.searchParams.get('name') ?? 'Dale' };
   }
 
   private getPlayerProgressionStore(): PlayerProgressionStore {
