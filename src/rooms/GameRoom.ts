@@ -24,7 +24,7 @@ import { setPlayerCharacterName } from '../systems/player/PlayerProgression';
 import { PlayerProgressionStore } from '../systems/player/PlayerProgressionStore';
 import { clamp } from '../utils/math';
 import { canCircleOccupyCell } from '../worldMap/runtimeWorldMap';
-import type { GameWorldMap, WorldMapCell, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
+import type { GameWorldMap, WorldMapCell, WorldMapItemOverride, WorldMapMonsterSpawnRule, WorldMapPlacement } from '../worldMap/types';
 
 const SNAPSHOT_RATE = GAME_CONFIG.world.snapshotRate;
 const RATE_LIMIT_PER_SECOND = GAME_CONFIG.network.rateLimitPerSecond;
@@ -54,6 +54,7 @@ type WorldMapManifest = {
   cellSize: number;
   cells: Array<{ gridX: number; gridY: number }>;
   monsterSpawnRules?: WorldMapMonsterSpawnRule[];
+  itemOverrides?: WorldMapItemOverride[];
 };
 
 type CompactWorldMapAsset = Omit<WorldMapPlacement, 'id' | 'x' | 'y' | 'layer' | 'scale'>;
@@ -231,6 +232,7 @@ export class GameRoom extends DurableObject<Env> {
         cellSize: manifest.cellSize,
         cells,
         monsterSpawnRules: manifest.monsterSpawnRules,
+        itemOverrides: manifest.itemOverrides,
       };
     }
 
@@ -249,6 +251,7 @@ export class GameRoom extends DurableObject<Env> {
       cellSize: map.cellSize,
       cells: map.cells.map((cell) => ({ gridX: cell.gridX, gridY: cell.gridY })),
       monsterSpawnRules: map.monsterSpawnRules,
+      itemOverrides: map.itemOverrides,
     };
 
     await this.ctx.storage.put(MAP_MANIFEST_STORAGE_KEY, manifest);
