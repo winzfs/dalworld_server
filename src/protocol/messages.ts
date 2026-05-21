@@ -77,6 +77,7 @@ export type MonsterSnapshot = {
   maxHp: number;
   state: MonsterStateName;
   targetPlayerId: string | null;
+  attackCooldownMs?: number;
 };
 
 export type WorldInfo = {
