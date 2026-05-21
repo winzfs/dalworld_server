@@ -1,6 +1,10 @@
 import type { BuildPartId } from '../building/BuildingTypes';
 import type { CraftingRecipeId } from '../crafting/CraftingTypes';
 import { QUEST_DEFINITIONS, getQuestDefinition } from './QuestDefinitions';
+import { grantCollectItemObjective } from './objectives/CollectItemObjective';
+import { grantCraftRecipeObjective } from './objectives/CraftRecipeObjective';
+import { grantPlaceBuildPartObjective } from './objectives/PlaceBuildPartObjective';
+import { getObjectiveProgress, isQuestComplete } from './objectives/QuestObjectiveProgress';
 import type { PlayerQuestState, QuestId, QuestStateSnapshot } from './QuestTypes';
 
 const INITIAL_QUEST_ID: QuestId = 'chapter1.awakened_survivor';
@@ -48,61 +52,19 @@ export function serializeQuestState(state: PlayerQuestState): string {
 
 export class QuestService {
   grantCollectedItem(state: PlayerQuestState, itemId: string, amount: number): boolean {
-    if (amount <= 0) return false;
-    let changed = false;
-
-    for (const questId of state.activeQuestIds) {
-      const quest = getQuestDefinition(questId);
-      if (!quest) continue;
-
-      for (const objective of quest.objectives) {
-        if (objective.type !== 'collect_item' || objective.itemId !== itemId) continue;
-        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
-          changed = true;
-        }
-      }
-    }
-
+    const changed = grantCollectItemObjective(state, itemId, amount);
     if (changed) this.completeFinishedQuests(state);
     return changed;
   }
 
   grantPlacedBuildPart(state: PlayerQuestState, partId: BuildPartId, amount = 1): boolean {
-    if (amount <= 0) return false;
-    let changed = false;
-
-    for (const questId of state.activeQuestIds) {
-      const quest = getQuestDefinition(questId);
-      if (!quest) continue;
-
-      for (const objective of quest.objectives) {
-        if (objective.type !== 'place_build_part' || objective.partId !== partId) continue;
-        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
-          changed = true;
-        }
-      }
-    }
-
+    const changed = grantPlaceBuildPartObjective(state, partId, amount);
     if (changed) this.completeFinishedQuests(state);
     return changed;
   }
 
   grantCraftedRecipe(state: PlayerQuestState, recipeId: CraftingRecipeId, amount = 1): boolean {
-    if (amount <= 0) return false;
-    let changed = false;
-
-    for (const questId of state.activeQuestIds) {
-      const quest = getQuestDefinition(questId);
-      if (!quest) continue;
-
-      for (const objective of quest.objectives) {
-        if (objective.type !== 'craft_recipe' || objective.recipeId !== recipeId) continue;
-        if (this.advanceObjective(state, quest.id, objective.id, objective.required, amount)) {
-          changed = true;
-        }
-      }
-    }
-
+    const changed = grantCraftRecipeObjective(state, recipeId, amount);
     if (changed) this.completeFinishedQuests(state);
     return changed;
   }
@@ -116,7 +78,7 @@ export class QuestService {
         .filter((quest): quest is NonNullable<typeof quest> => quest !== null)
         .map((quest) => {
           const objectives = quest.objectives.map((objective) => {
-            const current = Math.min(objective.required, normalized.objectiveProgress[getObjectiveKey(quest.id, objective.id)] ?? 0);
+            const current = Math.min(objective.required, getObjectiveProgress(normalized, quest.id, objective.id));
             return {
               ...objective,
               current,
@@ -136,30 +98,11 @@ export class QuestService {
     };
   }
 
-  private advanceObjective(
-    state: PlayerQuestState,
-    questId: QuestId,
-    objectiveId: string,
-    required: number,
-    amount: number,
-  ): boolean {
-    const key = getObjectiveKey(questId, objectiveId);
-    const previous = state.objectiveProgress[key] ?? 0;
-    const next = Math.min(required, previous + amount);
-    if (next === previous) return false;
-    state.objectiveProgress[key] = next;
-    return true;
-  }
-
   private completeFinishedQuests(state: PlayerQuestState): void {
     for (const questId of [...state.activeQuestIds]) {
       const quest = getQuestDefinition(questId);
-      if (!quest) continue;
-      const done = quest.objectives.every((objective) => {
-        const current = state.objectiveProgress[getObjectiveKey(quest.id, objective.id)] ?? 0;
-        return current >= objective.required;
-      });
-      if (!done) continue;
+      if (!quest || !isQuestComplete(state, questId)) continue;
+
       state.activeQuestIds = state.activeQuestIds.filter((id) => id !== questId);
       if (!state.completedQuestIds.includes(questId)) state.completedQuestIds.push(questId);
       if (quest.nextQuestId && !state.completedQuestIds.includes(quest.nextQuestId) && !state.activeQuestIds.includes(quest.nextQuestId)) {
@@ -167,10 +110,6 @@ export class QuestService {
       }
     }
   }
-}
-
-function getObjectiveKey(questId: string, objectiveId: string): string {
-  return `${questId}:${objectiveId}`;
 }
 
 function isKnownQuestId(value: string): value is QuestId {
