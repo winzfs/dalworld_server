@@ -45,6 +45,7 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - 제작도구 요구조건을 데이터로 관리한다.
 - 제작도구는 현재 인벤토리 보유 여부로 검증하며, 향후 거점에 설치된 제작대/화로/조립기 판정과 연결한다.
 - 아이템 카탈로그와 레시피는 서버/클라이언트가 동기화되어야 한다.
+- 월드맵 에디터의 `itemOverrides`는 서버 런타임에서 일부 게임 판정에 반영된다.
 
 현재 제작 티어의 의도는 다음과 같다.
 
@@ -87,6 +88,8 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - 몬스터 처치 경험치 지급과 레벨업 이벤트
 - 자원 채집 처리
 - 자원 리스폰
+- 자원 `itemOverrides` 반영: `gatherYield`, `nodeHp`, `respawnMs`
+- 채집 보상 legacy inventory와 generic inventory stack 동기화
 - 몬스터 idle/chase/attack AI
 - 몬스터별 서버 권위 스펙 정의: `src/systems/monster/MonsterDefinitions.ts`
 - 몬스터별 HP/이동속도/감지범위/추적해제범위/공격력/공격속도/공격범위/충돌/드롭 보상
@@ -97,6 +100,7 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - 제작 요청 처리
 - 제작 레시피 서버 검증
 - 제작도구 요구조건 검증
+- 제작 건물 `itemOverrides.craftSpeedMultiplier` 기반 제작 시간 보정
 - 초반/중반/후반 제작 레시피 데이터
 - 제작 재료 차감 및 결과 아이템 지급
 - 인벤토리 snapshot 처리
@@ -110,6 +114,9 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - 월드맵 GET/PUT
 - 월드맵 cell 저장
 - 월드맵 manifest 저장
+- 월드맵 Monsters 탭 전용 저장: `PUT /maps/default/monsters`
+- 월드맵 Items 탭 전용 저장: `PUT /maps/default/items`
+- 월드맵 저장 후 Durable Object 런타임 즉시 재로딩
 - compact cell format 확장
 - 낮/밤 토글
 
@@ -121,6 +128,8 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - 전투 밸런스 검증
 - 레벨/경험치 밸런스 검증
 - 제작 레시피 밸런스 검증
+- 탭별 에디터 저장 UX 실기기 검증
+- `itemOverrides` 전체 카테고리 필드의 실제 서버 판정 반영 범위 확장
 - 제작도구를 실제 설치된 건설물/거점 오브젝트와 연동
 - 제작 시간/대기열/자동화 제작 구조
 - 플레이어 진행도 영속화
@@ -171,6 +180,7 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 - world state: `src/sim/WorldState.ts`
 - building system: `src/systems/building/*`
 - inventory system: `src/systems/inventory/*`
+- runtime item override helpers: `src/systems/inventory/RuntimeItemOverrides.ts`
 - crafting system: `src/systems/crafting/*`
 - world map: `src/worldMap/*`
 - game config: `src/config/gameConfig.ts`
@@ -179,7 +189,7 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 
 ### GameRoom 책임 증가
 
-`GameRoom.ts`는 현재 WebSocket, 메시지 라우팅, 맵 저장, 건설 저장, 제작 처리, 낮/밤 토글, 전투 요청 처리, tick loop를 모두 연결한다.
+`GameRoom.ts`는 현재 WebSocket, 메시지 라우팅, 맵 저장, 에디터 탭별 저장, 건설 저장, 제작 처리, 낮/밤 토글, 전투 요청 처리, tick loop를 모두 연결한다.
 새 기능을 추가할 때는 가능한 한 별도 서비스로 분리한다.
 
 ### 장르 방향성 유지
@@ -192,6 +202,26 @@ DalWorld는 **팰월드, 마인크래프트, 테라리아, 원스휴먼 계열�
 제작은 서버가 레시피, 재료, 제작도구 요구조건을 검증한 뒤 확정한다.
 제작 레시피를 수정할 때는 서버와 클라이언트의 아이템 카탈로그/레시피 타입/레시피 데이터를 함께 갱신한다.
 현재 제작도구는 인벤토리 보유 아이템으로 검증하지만, 향후 거점에 배치된 제작 시설 판정으로 확장해야 한다.
+월드맵 Items 탭의 `craftSpeedMultiplier`는 서버 제작 시간 계산에 반영된다.
+
+### 월드맵 에디터 서버 저장 구조
+
+에디터 저장은 payload 실패 범위를 줄이기 위해 탭별로 분리한다.
+
+```txt
+Tiles 저장
+  -> /maps/default/cell
+  -> /maps/default/manifest
+
+Monsters 저장
+  -> /maps/default/monsters
+
+Items 저장
+  -> /maps/default/items
+```
+
+`GET /maps/default`는 분리 저장된 셀, 몬스터 규칙, 아이템 override를 조합해 반환한다.
+각 저장 endpoint는 저장 완료 후 `loadWorldMapFromStorage()`와 `setWorldMap()`을 통해 현재 Durable Object 런타임에 즉시 반영한다.
 
 ### 몬스터 서버 권위 스펙
 
@@ -223,15 +253,16 @@ Node.js 전용 API를 사용하지 않는다.
 ## 8. 다음 우선순위 제안
 
 1. 타입체크/빌드 오류 수정
-2. 제작 UI 전체 레시피/티어 필터 UX 정리
-3. GameRoom 책임 분리
-4. 전투/레벨/제작 밸런스 조정
-5. 제작도구를 실제 건설물/거점 시설과 연동
-6. 몬스터 스폰/리스폰 테이블 설계
-7. 제작/인벤토리/플레이어 진행도 영속화 설계
-8. D1 기반 플레이어 저장 구조 설계
-9. 몬스터/펫 포획 시스템 설계
-10. 멀티 룸 구조 설계
+2. 탭별 맵/몬스터/아이템 저장 UX 실기기 검증
+3. 제작 UI 전체 레시피/티어 필터 UX 정리
+4. GameRoom 책임 분리
+5. 전투/레벨/제작 밸런스 조정
+6. 제작도구를 실제 건설물/거점 시설과 연동
+7. 몬스터 스폰/리스폰 테이블 설계
+8. 제작/인벤토리/플레이어 진행도 영속화 설계
+9. D1 기반 플레이어 저장 구조 설계
+10. 몬스터/펫 포획 시스템 설계
+11. 멀티 룸 구조 설계
 
 ## 9. 작업 체크리스트
 
