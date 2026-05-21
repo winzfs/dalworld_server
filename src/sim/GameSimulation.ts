@@ -56,6 +56,7 @@ export class GameSimulation {
       maxHp: m.maxHp,
       state: m.state,
       targetPlayerId: m.targetPlayerId,
+      attackCooldownMs: m.attackCooldownMs,
     }));
 
     return {
