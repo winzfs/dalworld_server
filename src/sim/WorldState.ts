@@ -82,6 +82,8 @@ export type MonsterEntity = {
   attackDamage: number;
   attackCooldownMs: number;
   nextAttackAt: number;
+  /** Increments only when the server actually applies an attack. */
+  attackSeq: number;
   spawnRegionId?: string;
   spawnRuleId?: string;
 };
