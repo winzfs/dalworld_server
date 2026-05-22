@@ -175,7 +175,7 @@ export class CombatService {
     if (explicit && this.canHit(player, explicit)) return explicit;
 
     let best: MonsterEntity | null = null;
-    let bestDistance = GAME_CONFIG.combat.playerAttackRange;
+    let bestDistance: number = GAME_CONFIG.combat.playerAttackRange;
 
     for (const monster of world.monsters.values()) {
       if (!this.canHit(player, monster)) continue;
@@ -204,20 +204,20 @@ function isFacing(value: unknown): value is Facing {
 }
 
 function isInFront(player: PlayerEntity, monster: MonsterEntity): boolean {
-  const facing = FACING_VECTOR[player.facing];
+  const vector = FACING_VECTOR[player.facing];
   const dx = monster.x - player.x;
   const dy = monster.y - player.y;
   const length = Math.hypot(dx, dy);
-  if (length <= 0.001) return true;
-  const dot = (dx / length) * facing.x + (dy / length) * facing.y;
-  return dot >= -0.35;
+  if (length <= 0.0001) return true;
+  const nx = dx / length;
+  const ny = dy / length;
+  return nx * vector.x + ny * vector.y >= 0.25;
 }
 
 function getMonsterHitRadius(monster: MonsterEntity): number {
-  return getMonsterDefinition(monster.type).collision.radius;
+  return monster.type === 'sheep' ? 36 : 28;
 }
 
 function clamp01(value: number): number {
-  if (!Number.isFinite(value)) return 0;
   return Math.min(1, Math.max(0, value));
 }
