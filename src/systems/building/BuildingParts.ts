@@ -1,3 +1,4 @@
+import type { InventoryItemStack } from '../inventory/InventoryStore';
 import type { BuildPartDefinition, BuildPartId } from './BuildingTypes';
 
 type Row = [BuildPartId, BuildPartDefinition['category'], BuildPartDefinition['slotKind'], boolean, boolean, BuildPartDefinition['allowedOn'], BuildPartDefinition['placementCost'], BuildPartDefinition['refundOnRemove']];
@@ -6,16 +7,16 @@ const FLOOR_SUPPORTS: BuildPartId[] = ['floor_1x1', 'stone_floor_1x1', 'deck_flo
 const STAIR_SUPPORTS: BuildPartId[] = [...FLOOR_SUPPORTS, 'wood_stairs', 'stone_stairs', 'wood_corner_stairs', 'stone_corner_stairs'];
 const WALL_SUPPORTS: BuildPartId[] = ['thin_wall', 'wood_wall_sprite_test', 'stone_wall', 'half_wall', 'railing', 'fence', 'wood_wall_corner', 'stone_wall_corner', 'wood_wall_end', 'stone_wall_end', 'wood_gable_wall', 'stone_gable_wall', 'wood_round_wall', 'stone_round_wall', 'wood_beam_horizontal', 'stone_beam_horizontal', 'wood_diagonal_support', 'stone_diagonal_support', 'pillar', 'stone_pillar', 'short_post', 'door', 'stone_door', 'window', 'wide_window'];
 
-const W1 = [{ itemId: 'wood', quantity: 1 }];
-const W2 = [{ itemId: 'wood', quantity: 2 }];
-const W3 = [{ itemId: 'wood', quantity: 3 }];
-const W4 = [{ itemId: 'wood', quantity: 4 }];
-const S1 = [{ itemId: 'stone', quantity: 1 }];
-const S2 = [{ itemId: 'stone', quantity: 2 }];
-const S3 = [{ itemId: 'stone', quantity: 3 }];
-const S4 = [{ itemId: 'stone', quantity: 4 }];
-const S5 = [{ itemId: 'stone', quantity: 5 }];
-const STATION_WORKBENCH = [{ itemId: 'workbench', quantity: 1 }];
+const W1: InventoryItemStack[] = [{ itemId: 'wood', quantity: 1 }];
+const W2: InventoryItemStack[] = [{ itemId: 'wood', quantity: 2 }];
+const W3: InventoryItemStack[] = [{ itemId: 'wood', quantity: 3 }];
+const W4: InventoryItemStack[] = [{ itemId: 'wood', quantity: 4 }];
+const S1: InventoryItemStack[] = [{ itemId: 'stone', quantity: 1 }];
+const S2: InventoryItemStack[] = [{ itemId: 'stone', quantity: 2 }];
+const S3: InventoryItemStack[] = [{ itemId: 'stone', quantity: 3 }];
+const S4: InventoryItemStack[] = [{ itemId: 'stone', quantity: 4 }];
+const S5: InventoryItemStack[] = [{ itemId: 'stone', quantity: 5 }];
+const STATION_WORKBENCH: InventoryItemStack[] = [{ itemId: 'workbench', quantity: 1 }];
 
 const rows: Row[] = [
   ['floor_1x1', 'floor', 'tile', false, false, 'ground', W1, W1],
