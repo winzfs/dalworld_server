@@ -8,7 +8,7 @@ export const QUEST_DEFINITIONS: QuestDefinition[] = [
 
 validateQuestDefinitions(QUEST_DEFINITIONS);
 
-const QUEST_DEFINITION_BY_ID = new Map(QUEST_DEFINITIONS.map((quest) => [quest.id, quest]));
+const QUEST_DEFINITION_BY_ID = new Map<string, QuestDefinition>(QUEST_DEFINITIONS.map((quest) => [quest.id, quest]));
 
 export function getQuestDefinition(id: string): QuestDefinition | null {
   return QUEST_DEFINITION_BY_ID.get(id) ?? null;
