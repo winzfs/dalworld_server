@@ -10,6 +10,8 @@ export type GameSimulationStepOptions = {
   buildingGrid?: BuildingGrid;
 };
 
+type SnapshotMessage = Extract<ServerToClientMessage, { type: 'snapshot' }>;
+
 export class GameSimulation {
   readonly world = new WorldState();
   readonly players = new PlayerSystem();
@@ -28,7 +30,7 @@ export class GameSimulation {
     this.monsters.update(this.world, dt, { buildingGrid: options.buildingGrid, nowMs });
   }
 
-  buildSnapshot(nowMs: number): ServerToClientMessage {
+  buildSnapshot(nowMs: number): SnapshotMessage {
     const resources: ResourceSnapshot[] = [...this.world.resources.values()].map((r) => ({
       id: r.id,
       type: r.type,
