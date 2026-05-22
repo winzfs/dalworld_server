@@ -1,7 +1,10 @@
 let schemaReady: Promise<void> | null = null;
 
 export function ensureAuthSchema(db: D1Database): Promise<void> {
-  schemaReady ??= createAuthSchema(db);
+  schemaReady ??= createAuthSchema(db).catch((error) => {
+    schemaReady = null;
+    throw error;
+  });
   return schemaReady;
 }
 
