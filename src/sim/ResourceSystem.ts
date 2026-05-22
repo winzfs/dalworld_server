@@ -150,12 +150,13 @@ export class ResourceSystem {
     const template = TEMPLATES[type];
     if (!template) return null;
 
+    const resourceGameplay = placement.gameplay?.kind === 'resource' ? placement.gameplay : undefined;
     const drop = template.drop;
     const maxHp = Math.floor(getWorldItemNumberField(
       map,
       drop,
       'nodeHp',
-      normalizePositiveNumber(placement.gameplay?.maxHp, template.maxHp),
+      normalizePositiveNumber(resourceGameplay?.maxHp, template.maxHp),
       { min: 1, max: 99_999 },
     ));
     const dropAmount = Math.floor(getWorldItemNumberField(map, drop, 'gatherYield', template.dropAmount, { min: 1, max: 999 }));
@@ -163,7 +164,7 @@ export class ResourceSystem {
       map,
       drop,
       'respawnMs',
-      normalizePositiveNumber(placement.gameplay?.respawnMs, template.respawnMs),
+      normalizePositiveNumber(resourceGameplay?.respawnMs, template.respawnMs),
       { min: 1_000, max: 3_600_000 },
     ));
     const scale = normalizePositiveNumber(placement.scale, 1);
@@ -245,107 +246,76 @@ function findNearestInteractableResource(world: WorldState, player: PlayerEntity
 }
 
 function canInteractWithResource(player: PlayerEntity, resource: ResourceEntity): boolean {
+  if (!isGatherableInCurrentCell(resource, player)) return false;
   return getDistanceToInteractionArea(player, resource) <= getGatherRangeForResource(resource.type);
 }
 
 function getDistanceToInteractionArea(player: PlayerEntity, resource: ResourceEntity): number {
   const area = getResourceInteractionArea(resource);
-  const closestX = clamp(player.x, area.left, area.right);
-  const closestY = clamp(player.y, area.top, area.bottom);
-  return Math.hypot(player.x - closestX, player.y - closestY);
+  const dx = player.x < area.left
+    ? area.left - player.x
+    : player.x > area.right
+      ? player.x - area.right
+      : 0;
+  const dy = player.y < area.top
+    ? area.top - player.y
+    : player.y > area.bottom
+      ? player.y - area.bottom
+      : 0;
+  return Math.hypot(dx, dy);
 }
 
 function getResourceInteractionArea(resource: ResourceEntity): InteractionArea {
-  const scale = normalizePositiveNumber(resource.assetScale, 1);
-  const width = normalizePositiveNumber(resource.displayWidth ?? resource.sourceRect?.width, 32) * scale;
-  const height = normalizePositiveNumber(resource.displayHeight ?? resource.sourceRect?.height, 32) * scale;
-
-  if (resource.type === 'tree') {
-    const trunkWidth = clamp(width * 0.42, 28, 96);
-    const trunkHeight = clamp(height * 0.42, 36, 128);
-    return {
-      left: resource.x - trunkWidth / 2,
-      right: resource.x + trunkWidth / 2,
-      top: resource.y - trunkHeight * 0.78,
-      bottom: resource.y + trunkHeight * 0.24,
-    };
-  }
-
-  const radiusX = clamp(width * 0.5, 20, 80);
-  const radiusY = clamp(height * 0.5, 20, 80);
+  const width = Math.max(1, resource.displayWidth ?? 32) * Math.max(0.1, resource.assetScale ?? 1);
+  const height = Math.max(1, resource.displayHeight ?? 32) * Math.max(0.1, resource.assetScale ?? 1);
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
   return {
-    left: resource.x - radiusX,
-    right: resource.x + radiusX,
-    top: resource.y - radiusY,
-    bottom: resource.y + radiusY,
+    left: resource.x - halfWidth,
+    top: resource.y - halfHeight,
+    right: resource.x + halfWidth,
+    bottom: resource.y + halfHeight,
   };
 }
 
-function getResourceInteractionPoint(
-  type: ResourceType,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): { x: number; y: number } {
-  if (type === 'tree') {
-    return {
-      x: x + width * 0.5,
-      y: y + height * 0.82,
-    };
-  }
-
+function getResourceInteractionPoint(type: ResourceType, x: number, y: number, width: number, height: number): { x: number; y: number } {
+  const offsetY = type === 'tree' ? height * 0.42 : height * 0.5;
   return {
-    x: x + width * 0.5,
-    y: y + height * 0.5,
+    x: x + width / 2,
+    y: y + offsetY,
   };
 }
 
 function getGatherRangeForResource(type: ResourceType): number {
-  return type === 'tree' ? GATHER_RANGE + 28 : GATHER_RANGE;
+  return GAME_CONFIG.resource.gatherRangesByType[type] ?? GATHER_RANGE;
 }
 
 function getPlacementResourceType(placement: WorldMapPlacement): ResourceType | null {
-  if (placement.gameplay?.kind === 'resource') {
-    return placement.gameplay.resourceType;
+  if (placement.gameplay?.kind === 'resource') return placement.gameplay.resourceType;
+  if (placement.categoryId === 'resources') {
+    if (placement.assetId.includes('stone')) return 'stone';
+    if (placement.assetId.includes('rock')) return 'stone';
+    if (placement.assetId.includes('tree')) return 'tree';
   }
-
-  if (placement.layer === 'collision') return null;
-
-  const filename = getFilename(placement.assetUrl).toLowerCase();
-  if (filename.startsWith('rock')) return 'stone';
-  if (filename.startsWith('stone')) return 'stone';
-  if (filename.startsWith('tree')) return 'tree';
   return null;
 }
 
+function normalizePositiveNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function addPlayerInventoryStack(player: PlayerEntity, itemId: InventoryItemId, quantity: number): void {
-  const existing = player.inventoryItems.find((stack) => stack.itemId === itemId);
-  if (existing) {
-    existing.quantity += quantity;
+  const stack = player.inventoryItems.find((item) => item.itemId === itemId);
+  if (stack) {
+    stack.quantity += quantity;
     return;
   }
-
   player.inventoryItems.push({ itemId, quantity });
 }
 
-function getFilename(url: string): string {
-  const cleanUrl = url.split('?')[0]?.split('#')[0] ?? url;
-  return cleanUrl.split('/').pop() ?? '';
-}
-
 function randomPosition(): { x: number; y: number } {
-  const margin = 100;
   return {
-    x: randomRange(margin, WORLD_WIDTH - margin),
-    y: randomRange(margin, WORLD_HEIGHT - margin),
+    x: randomRange(80, WORLD_WIDTH - 80),
+    y: randomRange(80, WORLD_HEIGHT - 80),
   };
-}
-
-function normalizePositiveNumber(value: number | undefined, fallback: number): number {
-  return Number.isFinite(value) && (value as number) > 0 ? (value as number) : fallback;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
