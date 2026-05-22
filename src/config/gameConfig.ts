@@ -32,6 +32,10 @@ export const GAME_CONFIG = {
     startingTrees: 60,
     startingStones: 40,
     gatherRange: 80,
+    gatherRangesByType: {
+      tree: 96,
+      stone: 80,
+    } satisfies Record<ResourceType, number>,
     gatherCooldownMs: 400,
     gatherDamage: 25,
     staminaCostPerGather: 8,
